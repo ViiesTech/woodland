@@ -67,7 +67,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Widget _buildNavItem(int index, String iconPath, String label) {
     final bool isSelected = _currentIndex == index;
-    final Color color = isSelected ? AppColors.primaryColor : Colors.grey[400]!;
+    final Color color = isSelected
+        ? AppColors.primaryColor
+        : Colors.white.withOpacity(0.5);
 
     return GestureDetector(
       onTap: () {

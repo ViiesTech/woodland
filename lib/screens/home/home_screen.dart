@@ -4,8 +4,10 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:the_woodlands_series/Components/textfield/primary_textfield.dart';
 import 'package:the_woodlands_series/components/card/global_card.dart';
 import 'package:the_woodlands_series/components/resource/app_assets.dart';
+import 'package:the_woodlands_series/components/resource/app_routers.dart';
 import 'package:the_woodlands_series/components/resource/app_textstyle.dart';
 import 'package:the_woodlands_series/screens/home/widgets/continue_reading_widget.dart';
+import 'package:the_woodlands_series/screens/profile/profile_screen.dart';
 
 import '../../components/resource/app_colors.dart';
 
@@ -108,7 +110,28 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                         ],
                       ),
-                      Image.asset(AppAssets.profileImg, height: 37.h),
+                      GestureDetector(
+                        onTap: () {
+                          AppRouter.routeTo(
+                            context,
+                            ProfileScreen(
+                              title: 'Profile',
+                              image: AppAssets.profileImg,
+                            ),
+                          );
+                        },
+                        child: Container(
+                          width: 37.h,
+                          height: 37.h,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            image: DecorationImage(
+                              image: AssetImage(AppAssets.profileImg),
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                   16.verticalSpace,

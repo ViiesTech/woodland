@@ -3,6 +3,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:the_woodlands_series/Components/resource/app_routers.dart';
 import 'package:the_woodlands_series/components/textfield/primary_textfield.dart';
+import 'package:the_woodlands_series/screens/profile/profile_screen.dart';
 import '../../components/resource/app_assets.dart';
 import '../../components/resource/app_colors.dart';
 import '../../components/resource/app_textstyle.dart';
@@ -31,29 +32,27 @@ class MessagesScreen extends StatelessWidget {
                       fontSize: 24.sp,
                     ),
                   ),
-                  Stack(
-                    children: [
-                      CircleAvatar(
-                        radius: 20.r,
-                        backgroundImage: AssetImage(AppAssets.profileImg),
-                      ),
-                      Positioned(
-                        bottom: 0,
-                        right: 0,
-                        child: Container(
-                          width: 10.w,
-                          height: 10.h,
-                          decoration: BoxDecoration(
-                            color: Colors.green,
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: AppColors.bgClr,
-                              width: 1.5.w,
-                            ),
-                          ),
+                  GestureDetector(
+                    onTap: () {
+                      AppRouter.routeTo(
+                        context,
+                        ProfileScreen(
+                          title: 'Profile',
+                          image: AppAssets.profileImg,
+                        ),
+                      );
+                    },
+                    child: Container(
+                      width: 37.h,
+                      height: 37.h,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        image: DecorationImage(
+                          image: AssetImage(AppAssets.profileImg),
+                          fit: BoxFit.cover,
                         ),
                       ),
-                    ],
+                    ),
                   ),
                 ],
               ),

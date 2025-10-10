@@ -86,7 +86,11 @@ class ContinueReadingWidget extends StatelessWidget {
                           ),
                         ],
                       ),
-                      PrimaryButton(title: 'Continue', verPadding: 5.h),
+                      PrimaryButton(
+                        title: 'Continue',
+                        verPadding: 5.h,
+                        fontSize: 10.sp,
+                      ),
                     ],
                   ),
                 ],

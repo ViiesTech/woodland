@@ -2,11 +2,14 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:the_woodlands_series/Components/resource/app_routers.dart';
 import 'package:the_woodlands_series/components/resource/size_constants.dart';
+import 'package:the_woodlands_series/screens/reading/listen_screen.dart';
 
 import '../../components/resource/app_colors.dart';
 import '../../components/resource/app_textstyle.dart';
 import '../reading/reading_screen.dart';
+import '../reading/listen_screen.dart';
 
 class BookDetailScreen extends StatelessWidget {
   final String title;
@@ -121,14 +124,12 @@ class BookDetailScreen extends StatelessWidget {
                                 children: [
                                   GestureDetector(
                                     onTap: () {
-                                      Navigator.push(
+                                      AppRouter.routeTo(
                                         context,
-                                        MaterialPageRoute(
-                                          builder: (context) => ReadingScreen(
-                                            title: title,
-                                            author: author,
-                                            imageAsset: imageAsset,
-                                          ),
+                                        ReadingScreen(
+                                          title: title,
+                                          author: author,
+                                          imageAsset: imageAsset,
                                         ),
                                       );
                                     },
@@ -138,9 +139,21 @@ class BookDetailScreen extends StatelessWidget {
                                     ),
                                   ),
                                   20.horizontalSpace,
-                                  _buildActionButton(
-                                    icon: Icons.headphones,
-                                    text: 'Listen Book',
+                                  GestureDetector(
+                                    onTap: () {
+                                      AppRouter.routeTo(
+                                        context,
+                                        ListenScreen(
+                                          title: title,
+                                          author: author,
+                                          imageAsset: imageAsset,
+                                        ),
+                                      );
+                                    },
+                                    child: _buildActionButton(
+                                      icon: Icons.headphones,
+                                      text: 'Listen Book',
+                                    ),
                                   ),
                                 ],
                               ),

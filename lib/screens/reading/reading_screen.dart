@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:the_woodlands_series/components/button/primary_button.dart';
+import 'package:the_woodlands_series/components/resource/app_routers.dart';
 import '../../components/resource/app_colors.dart';
 import '../../components/resource/app_textstyle.dart';
 
@@ -70,10 +71,13 @@ class ReadingScreen extends StatelessWidget {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Icon(
-                        Icons.arrow_back_ios,
-                        color: Colors.white,
-                        size: 20.sp,
+                      GestureDetector(
+                        onTap: () => AppRouter.routeBack(context),
+                        child: Icon(
+                          Icons.arrow_back_ios,
+                          color: Colors.white,
+                          size: 20.sp,
+                        ),
                       ),
                       Icon(
                         Icons.bookmark_outline,

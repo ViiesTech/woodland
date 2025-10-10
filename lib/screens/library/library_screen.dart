@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:the_woodlands_series/components/card/global_card.dart';
 import 'package:the_woodlands_series/components/resource/app_assets.dart';
+import 'package:the_woodlands_series/components/resource/app_routers.dart';
 import 'package:the_woodlands_series/screens/library/pages/ebook_page.dart';
+import 'package:the_woodlands_series/screens/profile/profile_screen.dart';
 import '../../components/resource/app_colors.dart';
 import '../../components/resource/app_textstyle.dart';
 import 'widgets/custom_tab_widget.dart';
@@ -41,7 +43,28 @@ class _LibraryScreenState extends State<LibraryScreen> {
                     ),
                   ),
 
-                  Image.asset(AppAssets.profileImg, height: 37.h),
+                  GestureDetector(
+                        onTap: () {
+                          AppRouter.routeTo(
+                            context,
+                            ProfileScreen(
+                              title: 'Profile',
+                              image: AppAssets.profileImg,
+                            ),
+                          );
+                        },
+                        child: Container(
+                          width: 37.h,
+                          height: 37.h,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            image: DecorationImage(
+                              image: AssetImage(AppAssets.profileImg),
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                        ),
+                      ),
                 ],
               ),
             ),

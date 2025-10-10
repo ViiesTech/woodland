@@ -38,170 +38,172 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: SafeArea(
-        child: Padding(
-          padding: EdgeInsets.symmetric(
-            horizontal: SizeCons.getResponsiveWidth(24),
-            vertical: SizeCons.getResponsiveHeight(20),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              20.verticalSpace,
-              Text(
-                'The Woodlands Series',
-                style: TextStyle(
-                  fontFamily: 'cursive',
-                  fontSize: SizeCons.getResponsiveFontSize(20),
-                  fontWeight: FontWeight.w400,
-                  color: Colors.white,
-                  letterSpacing: 1.2,
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: SizeCons.getResponsiveWidth(24),
+              vertical: SizeCons.getResponsiveHeight(20),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                20.verticalSpace,
+                Text(
+                  'The Woodlands Series',
+                  style: TextStyle(
+                    fontFamily: 'cursive',
+                    fontSize: SizeCons.getResponsiveFontSize(20),
+                    fontWeight: FontWeight.w400,
+                    color: Colors.white,
+                    letterSpacing: 1.2,
+                  ),
                 ),
-              ),
-              46.verticalSpace,
-              // Sign In Title
-              Text(
-                'Sign Up',
-                style: AppTextStyles.lufgaLarge.copyWith(
-                  color: AppColors.primaryColor,
+                46.verticalSpace,
+                // Sign In Title
+                Text(
+                  'Sign Up',
+                  style: AppTextStyles.lufgaLarge.copyWith(
+                    color: AppColors.primaryColor,
+                  ),
                 ),
-              ),
-              40.verticalSpace,
-              // Social Login Buttons
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildSocialButton(
-                      'Facebook',
-                      AppAssets.fbIcon,
-                      Colors.blue,
-                    ),
-                  ),
-                  16.horizontalSpace,
-                  Expanded(
-                    child: _buildSocialButton(
-                      'Google',
-                      AppAssets.googleIcon,
-                      Colors.red,
-                    ),
-                  ),
-                ],
-              ),
-              16.verticalSpace,
-              Row(
-                children: [
-                  Expanded(
-                    child: Container(height: 1, color: Color(0xffE0E5EC)),
-                  ),
-                  Padding(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: SizeCons.getResponsiveWidth(16),
-                    ),
-                    child: Text(
-                      'Or',
-                      style: TextStyle(
-                        color: Colors.green,
-                        fontSize: SizeCons.getResponsiveFontSize(16),
-                        fontWeight: FontWeight.w500,
+                40.verticalSpace,
+                // Social Login Buttons
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildSocialButton(
+                        'Facebook',
+                        AppAssets.fbIcon,
+                        Colors.blue,
                       ),
                     ),
-                  ),
-                  Expanded(
-                    child: Container(height: 1, color: Color(0xffE0E5EC)),
-                  ),
-                ],
-              ),
-              24.verticalSpace,
-              PrimaryTextField(
-                controller: _nameController,
-                hint: 'Name',
-                shadow: true,
-              ),
-              16.verticalSpace,
-              PrimaryTextField(
-                controller: _emailController,
-                hint: 'Email/Phone Number',
-                shadow: true,
-              ),
-              16.verticalSpace,
-              PrimaryTextField(
-                controller: _passwordController,
-                hint: 'Password',
-                isPassword: true,
-                shadow: true,
-              ),
-              16.verticalSpace,
-              Row(
-                children: [
-                  PrimaryCheckBox(
-                    value: isAgreed,
-                    onChanged: (val) {
-                      setState(() {
-                        isAgreed = !isAgreed;
-                      });
-                    },
-                    keyId: "isAgreed",
-                  ),
-                  8.horizontalSpace,
-                  Expanded(
-                    child: RichText(
-                      text: TextSpan(
-                        children: [
-                          TextSpan(text: "I agree to the "),
-                          TextSpan(
-                            text: "Terms of Service",
-                            style: AppTextStyles.small.copyWith(
-                              color: AppColors.primaryColor,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          TextSpan(text: " and "),
-                          TextSpan(
-                            text: "Privacy Policy",
-                            style: AppTextStyles.small.copyWith(
-                              color: AppColors.primaryColor,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
+                    16.horizontalSpace,
+                    Expanded(
+                      child: _buildSocialButton(
+                        'Google',
+                        AppAssets.googleIcon,
+                        Colors.red,
                       ),
                     ),
-                  ),
-                ],
-              ),
-
-              26.verticalSpace,
-              PrimaryButton(
-                title: 'Create Account',
-                onTap: _signIn,
-                shadow: true,
-              ),
-              18.verticalSpace,
-              // Sign Up Link
-              GestureDetector(
-                onTap: () {
-                  AppRouter.routeTo(context, LoginScreen());
-                },
-                child: RichText(
-                  text: TextSpan(
-                    style: TextStyle(
-                      fontSize: SizeCons.getResponsiveFontSize(14),
-                      color: AppColors.greyColor,
+                  ],
+                ),
+                16.verticalSpace,
+                Row(
+                  children: [
+                    Expanded(
+                      child: Container(height: 1, color: Color(0xffE0E5EC)),
                     ),
-                    children: [
-                      const TextSpan(text: "Already have an account? "),
-                      TextSpan(
-                        text: 'Sign In',
+                    Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: SizeCons.getResponsiveWidth(16),
+                      ),
+                      child: Text(
+                        'Or',
                         style: TextStyle(
-                          color: AppColors.primaryColor,
+                          color: Colors.green,
+                          fontSize: SizeCons.getResponsiveFontSize(16),
                           fontWeight: FontWeight.w500,
                         ),
                       ),
-                    ],
+                    ),
+                    Expanded(
+                      child: Container(height: 1, color: Color(0xffE0E5EC)),
+                    ),
+                  ],
+                ),
+                24.verticalSpace,
+                PrimaryTextField(
+                  controller: _nameController,
+                  hint: 'Name',
+                  shadow: true,
+                ),
+                16.verticalSpace,
+                PrimaryTextField(
+                  controller: _emailController,
+                  hint: 'Email/Phone Number',
+                  shadow: true,
+                ),
+                16.verticalSpace,
+                PrimaryTextField(
+                  controller: _passwordController,
+                  hint: 'Password',
+                  isPassword: true,
+                  shadow: true,
+                ),
+                16.verticalSpace,
+                Row(
+                  children: [
+                    PrimaryCheckBox(
+                      value: isAgreed,
+                      onChanged: (val) {
+                        setState(() {
+                          isAgreed = !isAgreed;
+                        });
+                      },
+                      keyId: "isAgreed",
+                    ),
+                    8.horizontalSpace,
+                    Expanded(
+                      child: RichText(
+                        text: TextSpan(
+                          children: [
+                            TextSpan(text: "I agree to the "),
+                            TextSpan(
+                              text: "Terms of Service",
+                              style: AppTextStyles.small.copyWith(
+                                color: AppColors.primaryColor,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            TextSpan(text: " and "),
+                            TextSpan(
+                              text: "Privacy Policy",
+                              style: AppTextStyles.small.copyWith(
+                                color: AppColors.primaryColor,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+
+                26.verticalSpace,
+                PrimaryButton(
+                  title: 'Create Account',
+                  onTap: _signIn,
+                  shadow: true,
+                ),
+                18.verticalSpace,
+                // Sign Up Link
+                GestureDetector(
+                  onTap: () {
+                    AppRouter.routeTo(context, LoginScreen());
+                  },
+                  child: RichText(
+                    text: TextSpan(
+                      style: TextStyle(
+                        fontSize: SizeCons.getResponsiveFontSize(14),
+                        color: AppColors.greyColor,
+                      ),
+                      children: [
+                        const TextSpan(text: "Already have an account? "),
+                        TextSpan(
+                          text: 'Sign In',
+                          style: TextStyle(
+                            color: AppColors.primaryColor,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-              SizedBox(height: SizeCons.getResponsiveHeight(20)),
-            ],
+                SizedBox(height: SizeCons.getResponsiveHeight(20)),
+              ],
+            ),
           ),
         ),
       ),
