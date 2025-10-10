@@ -18,7 +18,7 @@ class AppColors {
   static const boxClr = Color(0xff273139);
 
   // Bottom Navigation Colors
-  static const bottomNavBackground = primaryColor;
+  static const bottomNavBackground = Color(0xff181A1A);
   static const bottomNavBackgroundOpacity = 1;
   static const bottomNavBorder = Color(0xff000000);
   static const bottomNavBorderOpacity = 0.2;

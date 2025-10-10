@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:the_woodlands_series/components/button/primary_button.dart';
+import 'package:the_woodlands_series/components/checkbox/primary_checkbox.dart';
 import 'package:the_woodlands_series/components/resource/app_assets.dart';
 import 'package:the_woodlands_series/components/resource/app_colors.dart';
 import 'package:the_woodlands_series/components/resource/app_routers.dart';
@@ -21,6 +22,8 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+
+  bool isAgreed = false;
 
   @override
   void dispose() {
@@ -118,7 +121,6 @@ class _LoginScreenState extends State<LoginScreen> {
                 controller: _passwordController,
                 hint: 'Password',
                 isPassword: true,
-                shadow: true,
               ),
               7.verticalSpace,
               // Forgot Password
@@ -139,32 +141,70 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
               16.verticalSpace,
-              PrimaryButton(title: 'Sign In', onTap: _signIn, shadow: true),
 
-              const Spacer(),
-              // Sign Up Link
-              Center(
-                child: GestureDetector(
-                  onTap: () {
-                    AppRouter.routeTo(context, RegisterScreen());
-                  },
-                  child: RichText(
-                    text: TextSpan(
-                      style: TextStyle(
-                        fontSize: SizeCons.getResponsiveFontSize(14),
-                        color: Colors.grey[400],
-                      ),
-                      children: [
-                        const TextSpan(text: "Don't have an account? "),
-                        TextSpan(
-                          text: 'Sign Up',
-                          style: TextStyle(
-                            color: Colors.green,
-                            fontWeight: FontWeight.w500,
+              Row(
+                children: [
+                  PrimaryCheckBox(
+                    value: isAgreed,
+                    onChanged: (val) {
+                      setState(() {
+                        isAgreed = !isAgreed;
+                      });
+                    },
+                    keyId: "isAgreed",
+                  ),
+                  8.horizontalSpace,
+                  Expanded(
+                    child: RichText(
+                      text: TextSpan(
+                        children: [
+                          TextSpan(text: "I agree to the "),
+                          TextSpan(
+                            text: "Terms of Service",
+                            style: AppTextStyles.small.copyWith(
+                              color: AppColors.primaryColor,
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
-                        ),
-                      ],
+                          TextSpan(text: " and "),
+                          TextSpan(
+                            text: "Privacy Policy",
+                            style: AppTextStyles.small.copyWith(
+                              color: AppColors.primaryColor,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
+                  ),
+                ],
+              ),
+
+              26.verticalSpace,
+              PrimaryButton(title: 'Sign In', onTap: _signIn, shadow: true),
+              16.verticalSpace,
+              // Sign Up Link
+              GestureDetector(
+                onTap: () {
+                  AppRouter.routeTo(context, RegisterScreen());
+                },
+                child: RichText(
+                  text: TextSpan(
+                    style: TextStyle(
+                      fontSize: SizeCons.getResponsiveFontSize(14),
+                      color: Colors.grey[400],
+                    ),
+                    children: [
+                      const TextSpan(text: "Don't have an account? "),
+                      TextSpan(
+                        text: 'Sign Up',
+                        style: TextStyle(
+                          color: Colors.green,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),

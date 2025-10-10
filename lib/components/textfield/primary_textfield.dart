@@ -148,11 +148,11 @@ class _PrimaryTextFieldState extends State<PrimaryTextField> {
             maxLines: widget.maxlines ?? 1,
             minLines: widget.minlines ?? 1,
             obscureText: widget.isPassword ? isObsure : false,
-            cursorColor: AppColors.blackColor,
+            cursorColor: AppColors.whiteColor,
             keyboardType: widget.keyboard,
             style: AppTextStyles.regular.copyWith(
               fontSize: widget.fontsize ?? (isTablet ? 12.sp : 14.sp),
-              color: widget.textColor,
+              color: widget.textColor ?? AppColors.whiteColor,
               fontWeight: FontWeight.w400,
             ),
             decoration: InputDecoration(
@@ -162,8 +162,8 @@ class _PrimaryTextFieldState extends State<PrimaryTextField> {
               fillColor: widget.fillColor ?? AppColors.boxClr,
               prefixIcon: widget.prefixIcon,
               prefixIconConstraints: BoxConstraints(
-                minWidth: 60.w,
-                minHeight: 60.h,
+                minWidth: 40.w,
+                minHeight: 40.h,
               ),
               hintText: widget.hint,
               labelStyle: AppTextStyles.small,

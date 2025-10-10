@@ -1,6 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import '../../components/resource/size_constants.dart';
+import '../../components/resource/app_assets.dart';
+import '../../components/resource/app_colors.dart';
+import '../home/home_screen.dart';
+import '../library/library_screen.dart';
+import '../messages/messages_screen.dart';
+import '../games/games_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -10,7 +17,7 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  int _currentIndex = 1; // Library is selected by default
+  int _currentIndex = 0;
 
   final List<Widget> _screens = [
     const HomeScreen(),
@@ -25,16 +32,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
       backgroundColor: Colors.black,
       body: _screens[_currentIndex],
       bottomNavigationBar: Container(
-        height: SizeCons.getResponsiveHeight(80),
+        height: 75.h,
         decoration: BoxDecoration(
-          color: const Color(0xFF2A2A2A),
-          borderRadius: BorderRadius.only(
-            topLeft: Radius.circular(SizeCons.getResponsiveRadius(20)),
-            topRight: Radius.circular(SizeCons.getResponsiveRadius(20)),
-          ),
+          color: AppColors.bottomNavBackground,
+
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.3),
+              color: Colors.black.withValues(alpha: 0.3),
               blurRadius: 10.r,
               offset: Offset(0, -2.h),
               spreadRadius: 0,
@@ -48,21 +52,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ],
         ),
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
-            _buildNavItem(0, Icons.home_outlined, 'Home'),
-            _buildNavItem(1, Icons.library_books_outlined, 'Library'),
-            _buildNavItem(2, Icons.message_outlined, 'Messages'),
-            _buildNavItem(3, Icons.sports_esports_outlined, 'Games'),
+            Expanded(child: _buildNavItem(0, AppAssets.homeIcon, 'Home')),
+            Expanded(child: _buildNavItem(1, AppAssets.libraryIcon, 'Library')),
+            Expanded(
+              child: _buildNavItem(2, AppAssets.messagesIcon, 'Messages'),
+            ),
+            Expanded(child: _buildNavItem(3, AppAssets.gamesIcon, 'Games')),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildNavItem(int index, IconData icon, String label) {
+  Widget _buildNavItem(int index, String iconPath, String label) {
     final bool isSelected = _currentIndex == index;
-    final Color color = isSelected ? Colors.green : Colors.grey[400]!;
+    final Color color = isSelected ? AppColors.primaryColor : Colors.grey[400]!;
 
     return GestureDetector(
       onTap: () {
@@ -71,28 +76,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
         });
       },
       child: Container(
-        padding: EdgeInsets.symmetric(
-          vertical: SizeCons.getResponsiveHeight(8),
-          horizontal: SizeCons.getResponsiveWidth(12),
-        ),
         decoration: BoxDecoration(
-          color: isSelected
-              ? Colors.green.withOpacity(0.1)
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(SizeCons.getResponsiveRadius(12)),
-          boxShadow: isSelected ? [
-            BoxShadow(
-              color: Colors.green.withOpacity(0.2),
-              blurRadius: 8.r,
-              offset: Offset(0, 2.h),
-              spreadRadius: 0,
-            ),
-          ] : null,
+          gradient: isSelected
+              ? LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [Color(0xff203029), Color(0xff181919)],
+                  stops: [0.0, 0.6],
+                )
+              : null,
+          color: isSelected ? null : Colors.transparent,
         ),
         child: Column(
-          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, color: color, size: SizeCons.getResponsiveFontSize(24)),
+            // SVG Icon with color filter
+            SvgPicture.asset(
+              iconPath,
+
+              colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
+            ),
             SizedBox(height: SizeCons.getResponsiveHeight(4)),
             Text(
               label,
@@ -103,87 +106,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-// Placeholder screens for each tab
-class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      color: Colors.black,
-      child: Center(
-        child: Text(
-          'Home Screen',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: SizeCons.getResponsiveFontSize(24),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class LibraryScreen extends StatelessWidget {
-  const LibraryScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      color: Colors.black,
-      child: Center(
-        child: Text(
-          'Library Screen',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: SizeCons.getResponsiveFontSize(24),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class MessagesScreen extends StatelessWidget {
-  const MessagesScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      color: Colors.black,
-      child: Center(
-        child: Text(
-          'Messages Screen',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: SizeCons.getResponsiveFontSize(24),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class GamesScreen extends StatelessWidget {
-  const GamesScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      color: Colors.black,
-      child: Center(
-        child: Text(
-          'Games Screen',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: SizeCons.getResponsiveFontSize(24),
-          ),
         ),
       ),
     );

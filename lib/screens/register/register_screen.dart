@@ -141,19 +141,35 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     },
                     keyId: "isAgreed",
                   ),
+                  8.horizontalSpace,
+                  Expanded(
+                    child: RichText(
+                      text: TextSpan(
+                        children: [
+                          TextSpan(text: "I agree to the "),
+                          TextSpan(
+                            text: "Terms of Service",
+                            style: AppTextStyles.small.copyWith(
+                              color: AppColors.primaryColor,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          TextSpan(text: " and "),
+                          TextSpan(
+                            text: "Privacy Policy",
+                            style: AppTextStyles.small.copyWith(
+                              color: AppColors.primaryColor,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ],
               ),
 
-              // CustomCheckbox(
-              //   label: 'I agree to The Terms of Service and Privacy Policy',
-              //   value: isAgreed,
-              //   onChanged: (val) {
-              //     setState(() {
-              //       isAgreed = isAgreed!;
-              //     });
-              //   },
-              // ),
-              16.verticalSpace,
+              26.verticalSpace,
               PrimaryButton(
                 title: 'Create Account',
                 onTap: _signIn,

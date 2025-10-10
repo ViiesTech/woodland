@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:device_preview/device_preview.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:the_woodlands_series/components/resource/app_colors.dart';
+import 'package:the_woodlands_series/screens/dashboard_screen/dashboard_screen.dart';
 import 'screens/splash_screen.dart';
 
 void main() {
@@ -43,7 +44,7 @@ class MyApp extends StatelessWidget {
               foregroundColor: Colors.white,
             ),
           ),
-          home: const SplashScreen(),
+          home: const DashboardScreen(),
         );
       },
     );

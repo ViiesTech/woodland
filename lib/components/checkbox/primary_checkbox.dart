@@ -16,7 +16,7 @@ class PrimaryCheckBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    double size = 19.sp;
+    double size = 16.sp;
     return GestureDetector(
       onTap: () => onChanged(!value),
       child: Container(
@@ -24,12 +24,12 @@ class PrimaryCheckBox extends StatelessWidget {
         width: size,
         decoration: BoxDecoration(
           color: value ? AppColors.primaryColor : Colors.transparent,
-          borderRadius: BorderRadius.circular(6.r),
+          borderRadius: BorderRadius.circular(2.r),
           border: Border.all(color: AppColors.primaryColor),
         ),
         child: value
             ? Center(
-                child: Icon(Icons.done, color: AppColors.bgClr, size: 16.sp),
+                child: Icon(Icons.done, color: AppColors.bgClr, size: 14.sp),
               )
             : null,
       ),

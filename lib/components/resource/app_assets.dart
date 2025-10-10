@@ -6,6 +6,12 @@ class AppAssets {
   static const googleIcon = "assets/icons/googleIcon.svg";
   static const headphoneIcon = "assets/icons/headphoneIcon.svg";
   static const readIcon = "assets/icons/readIcon.svg";
+  
+  // Navigation Icons
+  static const homeIcon = "assets/icons/homeIcon.svg";
+  static const libraryIcon = "assets/icons/libIcon.svg";
+  static const messagesIcon = "assets/icons/chatIcon.svg";
+  static const gamesIcon = "assets/icons/gamesIcon.svg";
 
   // TEmp Images'
   static const temp1 = "assets/tempImg/temp1.png";
