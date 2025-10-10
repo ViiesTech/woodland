@@ -42,6 +42,7 @@ dependencies:
   intl: ^0.20.2
   fluttertoast: ^9.0.0
   device_preview: ^1.1.0
+  audioplayers: ^6.1.0
 
 dev_dependencies:
   flutter_test:
@@ -69,6 +70,7 @@ flutter:
   assets:
     - assets/tempImg/
     - assets/icons/
+    - assets/audio/
   #   - images/a_dot_ham.jpeg
 
   # An image asset can refer to one or more resolution-specific "variants", see

@@ -83,6 +83,21 @@ class PrimaryTextField extends StatefulWidget {
 
 class _PrimaryTextFieldState extends State<PrimaryTextField> {
   bool isObsure = true;
+  ScrollController? _scrollController;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.maxlines != null && widget.maxlines! > 4) {
+      _scrollController = ScrollController();
+    }
+  }
+
+  @override
+  void dispose() {
+    _scrollController?.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -119,6 +134,12 @@ class _PrimaryTextFieldState extends State<PrimaryTextField> {
         Container(
           width: widget.width,
           height: widget.height,
+          constraints: widget.maxlines != null && widget.maxlines! > 4
+              ? BoxConstraints(
+                  maxHeight: 4 * 20.h, // Max height for 4 lines
+                  minHeight: 20.h, // Min height for 1 line
+                )
+              : null,
           decoration: BoxDecoration(
             boxShadow: [
               widget.shadow
@@ -145,7 +166,9 @@ class _PrimaryTextFieldState extends State<PrimaryTextField> {
             onChanged: widget.onChanged,
             onTapOutside: (_) => FocusScope.of(context).unfocus(),
             focusNode: widget.focus,
-            maxLines: widget.maxlines ?? 1,
+            maxLines: widget.maxlines != null && widget.maxlines! > 4
+                ? null
+                : widget.maxlines ?? 1,
             minLines: widget.minlines ?? 1,
             obscureText: widget.isPassword ? isObsure : false,
             cursorColor: AppColors.whiteColor,
