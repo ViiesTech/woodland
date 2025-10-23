@@ -62,10 +62,15 @@ class BookDetailScreen extends StatelessWidget {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Icon(
-                          Icons.arrow_back_ios,
-                          color: Colors.white,
-                          size: 20.sp,
+                        GestureDetector(
+                          onTap: () {
+                            AppRouter.routeBack(context);
+                          },
+                          child: Icon(
+                            Icons.arrow_back_ios,
+                            color: Colors.white,
+                            size: 20.sp,
+                          ),
                         ),
                         Icon(
                           Icons.bookmark_outline,

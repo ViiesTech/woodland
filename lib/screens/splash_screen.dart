@@ -94,14 +94,18 @@ class _SplashScreenState extends State<SplashScreen>
                     ),
                     SizedBox(height: SizeCons.getResponsiveHeight(30)),
                     // App Title
-                    Text(
-                      'The Woodlands Series',
-                      style: TextStyle(
-                        fontFamily: 'cursive',
-                        fontSize: SizeCons.getResponsiveFontSize(28),
-                        fontWeight: FontWeight.w400,
-                        color: Colors.white,
-                        letterSpacing: 1.2,
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: Text(
+                        'GlennVerse',
+                        style: TextStyle(
+                          fontFamily: 'cursive',
+                          fontSize: SizeCons.getResponsiveFontSize(28),
+                          fontWeight: FontWeight.w400,
+                          color: Colors.white,
+                          letterSpacing: 1.2,
+                        ),
+                        textAlign: TextAlign.center,
                       ),
                     ),
                     SizedBox(height: SizeCons.getResponsiveHeight(10)),

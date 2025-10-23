@@ -47,7 +47,7 @@ class _LoginScreenState extends State<LoginScreen> {
               children: [
                 20.verticalSpace,
                 Text(
-                  'The Woodlands Series',
+                  'GlennVerse',
                   style: TextStyle(
                     fontFamily: 'cursive',
                     fontSize: SizeCons.getResponsiveFontSize(20),

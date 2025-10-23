@@ -49,7 +49,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               children: [
                 20.verticalSpace,
                 Text(
-                  'The Woodlands Series',
+                  'GlennVerse',
                   style: TextStyle(
                     fontFamily: 'cursive',
                     fontSize: SizeCons.getResponsiveFontSize(20),
