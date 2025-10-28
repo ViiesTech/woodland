@@ -70,14 +70,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 // Social Login Buttons
                 Row(
                   children: [
-                    Expanded(
-                      child: _buildSocialButton(
-                        'Facebook',
-                        AppAssets.fbIcon,
-                        Colors.blue,
-                      ),
-                    ),
-                    16.horizontalSpace,
+                    // Expanded(
+                    //   child: _buildSocialButton(
+                    //     'Facebook',
+                    //     AppAssets.fbIcon,
+                    //     Colors.blue,
+                    //   ),
+                    // ),
+                    // 16.horizontalSpace,
                     Expanded(
                       child: _buildSocialButton(
                         'Google',

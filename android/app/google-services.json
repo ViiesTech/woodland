@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "931656574267",
+    "project_id": "glennverse-3cf94",
+    "storage_bucket": "glennverse-3cf94.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:931656574267:android:e63638eaf0dce348b9c31e",
+        "android_client_info": {
+          "package_name": "com.glennverse.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDog6QISLjgbwgypqw11d2vl8kvmFVwLSw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

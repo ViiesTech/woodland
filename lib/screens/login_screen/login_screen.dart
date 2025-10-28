@@ -68,15 +68,15 @@ class _LoginScreenState extends State<LoginScreen> {
                 // Social Login Buttons
                 Row(
                   children: [
-                    Expanded(
-                      child: _buildSocialButton(
-                        'Facebook',
-                        AppAssets.fbIcon,
-                        Colors.blue,
-                        shadow: true,
-                      ),
-                    ),
-                    16.horizontalSpace,
+                    // Expanded(
+                    //   child: _buildSocialButton(
+                    //     'Facebook',
+                    //     AppAssets.fbIcon,
+                    //     Colors.blue,
+                    //     shadow: true,
+                    //   ),
+                    // ),
+                    // 16.horizontalSpace,
                     Expanded(
                       child: _buildSocialButton(
                         'Google',

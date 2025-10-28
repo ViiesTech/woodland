@@ -1,4 +1,4 @@
-package com.example.the_woodlands_series
+package com.glennverse.app
 
 import io.flutter.embedding.android.FlutterActivity
 

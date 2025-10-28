@@ -8,7 +8,7 @@
 PRODUCT_NAME = the_woodlands_series
 
 // The application's bundle identifier
-PRODUCT_BUNDLE_IDENTIFIER = com.example.theWoodlandsSeries
+PRODUCT_BUNDLE_IDENTIFIER = com.glennverse.app
 
 // The copyright displayed in application information
 PRODUCT_COPYRIGHT = Copyright © 2025 com.example. All rights reserved.

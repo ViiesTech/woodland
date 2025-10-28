@@ -4,6 +4,7 @@ import 'package:device_preview/device_preview.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:the_woodlands_series/components/resource/app_colors.dart';
 import 'screens/splash_screen.dart';
+import 'admin_panel/admin_access.dart';
 
 void main() {
   runApp(
@@ -46,9 +47,24 @@ class MyApp extends StatelessWidget {
               foregroundColor: Colors.white,
             ),
           ),
-          home: const SplashScreen(),
+          home: const SplashScreenWithAdmin(),
         );
       },
+    );
+  }
+}
+
+class SplashScreenWithAdmin extends StatelessWidget {
+  const SplashScreenWithAdmin({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        const SplashScreen(),
+        // Admin access button (only in debug mode)
+        if (kDebugMode) AdminAccess.buildAdminButton(context),
+      ],
     );
   }
 }

@@ -1,0 +1,17 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "GlennVerse App",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart"
+    },
+    {
+      "name": "Admin Panel",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/admin_main_standalone.dart"
+    }
+  ]
+}
