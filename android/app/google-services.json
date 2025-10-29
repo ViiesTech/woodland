@@ -12,7 +12,20 @@
           "package_name": "com.glennverse.app"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "931656574267-03tu4cr2gtgrm6jucl4qdstcu52qtjae.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.glennverse.app",
+            "certificate_hash": "189d785189ffc5c758c76d99d92e970d114674ef"
+          }
+        },
+        {
+          "client_id": "931656574267-2kkbdocpm36u5q48qog8rcqq3jhigifp.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyDog6QISLjgbwgypqw11d2vl8kvmFVwLSw"
@@ -20,7 +33,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "931656574267-2kkbdocpm36u5q48qog8rcqq3jhigifp.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "931656574267-sm0f41lsmdi70p8epjievgb23e54qek5.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.glennverse.app"
+              }
+            }
+          ]
         }
       }
     }

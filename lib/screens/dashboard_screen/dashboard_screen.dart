@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../components/resource/size_constants.dart';
 import '../../components/resource/app_assets.dart';
 import '../../components/resource/app_colors.dart';
+import '../../bloc/auth/auth_bloc.dart';
+import '../../bloc/auth/auth_state.dart';
 import '../home/home_screen.dart';
+import '../admin_home/admin_home_screen.dart';
 import '../library/library_screen.dart';
 import '../messages/messages_screen.dart';
 import '../games/games_screen.dart';
@@ -18,19 +22,48 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   int _currentIndex = 0;
+  bool isAdmin = false;
 
-  final List<Widget> _screens = [
-    const HomeScreen(),
-    const LibraryScreen(),
-    const MessagesScreen(),
-    const GamesScreen(),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _checkUserRole();
+  }
+
+  void _checkUserRole() {
+    final authState = context.read<AuthBloc>().state;
+    if (authState is Authenticated) {
+      setState(() {
+        isAdmin = authState.user.role == 'admin';
+      });
+    }
+  }
+
+  List<Widget> _getScreens() {
+    if (isAdmin) {
+      return [
+        const AdminHomeScreen(),
+        const LibraryScreen(),
+        const MessagesScreen(),
+        const GamesScreen(),
+      ];
+    } else {
+      return [
+        const HomeScreen(),
+        const LibraryScreen(),
+        const MessagesScreen(),
+        const GamesScreen(),
+      ];
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final screens = _getScreens();
+
     return Scaffold(
       backgroundColor: Colors.black,
-      body: _screens[_currentIndex],
+      body: screens[_currentIndex],
       bottomNavigationBar: Container(
         height: 75.h,
         decoration: BoxDecoration(

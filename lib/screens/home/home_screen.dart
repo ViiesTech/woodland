@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:the_woodlands_series/Components/textfield/primary_textfield.dart';
 import 'package:the_woodlands_series/components/card/global_card.dart';
 import 'package:the_woodlands_series/components/resource/app_assets.dart';
@@ -8,6 +9,9 @@ import 'package:the_woodlands_series/components/resource/app_routers.dart';
 import 'package:the_woodlands_series/components/resource/app_textstyle.dart';
 import 'package:the_woodlands_series/screens/home/widgets/continue_reading_widget.dart';
 import 'package:the_woodlands_series/screens/profile/profile_screen.dart';
+import 'package:the_woodlands_series/bloc/auth/auth_bloc.dart';
+import 'package:the_woodlands_series/bloc/auth/auth_state.dart';
+import 'package:the_woodlands_series/models/user_model.dart';
 
 import '../../components/resource/app_colors.dart';
 
@@ -20,6 +24,22 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int selectedCategoryIndex = 0;
+  UserModel? currentUser;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserData();
+  }
+
+  void _loadUserData() {
+    final authState = context.read<AuthBloc>().state;
+    if (authState is Authenticated) {
+      setState(() {
+        currentUser = authState.user;
+      });
+    }
+  }
 
   final List<Map<String, String>> categories = [
     {'title': 'Trending', 'icon': AppAssets.fireIcon},
@@ -87,52 +107,52 @@ class _HomeScreenState extends State<HomeScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   16.verticalSpace,
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                  BlocBuilder<AuthBloc, AuthState>(
+                    builder: (context, state) {
+                      final user = state is Authenticated ? state.user : null;
+                      return Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(
-                            'Hi, Robby!',
-                            style: AppTextStyles.lufgaLarge.copyWith(
-                              color: Colors.white,
-                              fontSize: 20.sp,
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Hi, ${user?.name ?? 'Guest'}!',
+                                  style: AppTextStyles.lufgaLarge.copyWith(
+                                    color: Colors.white,
+                                    fontSize: 20.sp,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                8.verticalSpace,
+                                Text(
+                                  'What book do you wanna read today?',
+                                  style: AppTextStyles.regular.copyWith(
+                                    color: Colors.white.withValues(alpha: 0.5),
+                                    fontSize: 14.sp,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                          8.verticalSpace,
-                          Text(
-                            'What book do you wanna read today?',
-                            style: AppTextStyles.regular.copyWith(
-                              color: Colors.white.withValues(alpha: 0.5),
-                              fontSize: 14.sp,
-                            ),
+                          8.horizontalSpace,
+                          GestureDetector(
+                            onTap: () {
+                              AppRouter.routeTo(
+                                context,
+                                ProfileScreen(
+                                  title: 'Profile',
+                                  image: AppAssets.profileImg,
+                                ),
+                              );
+                            },
+                            child: _buildUserAvatar(user),
                           ),
                         ],
-                      ),
-                      GestureDetector(
-                        onTap: () {
-                          AppRouter.routeTo(
-                            context,
-                            ProfileScreen(
-                              title: 'Profile',
-                              image: AppAssets.profileImg,
-                            ),
-                          );
-                        },
-                        child: Container(
-                          width: 37.h,
-                          height: 37.h,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            image: DecorationImage(
-                              image: AssetImage(AppAssets.profileImg),
-                              fit: BoxFit.cover,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
+                      );
+                    },
                   ),
                   16.verticalSpace,
                   PrimaryTextField(
@@ -381,5 +401,78 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
     );
+  }
+
+  Widget _buildUserAvatar(UserModel? user) {
+    // If user has a profile image, show it
+    if (user?.profileImageUrl != null && user!.profileImageUrl!.isNotEmpty) {
+      return Container(
+        width: 37.h,
+        height: 37.h,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: AppColors.primaryColor.withOpacity(0.3),
+            width: 2,
+          ),
+          image: DecorationImage(
+            image: NetworkImage(user.profileImageUrl!),
+            fit: BoxFit.cover,
+          ),
+        ),
+      );
+    }
+
+    // If user has no image, show avatar with initials
+    if (user != null) {
+      return Container(
+        width: 37.h,
+        height: 37.h,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              AppColors.primaryColor,
+              AppColors.primaryColor.withOpacity(0.7),
+            ],
+          ),
+        ),
+        child: Center(
+          child: Text(
+            _getInitials(user.name),
+            style: AppTextStyles.lufgaMedium.copyWith(
+              color: Colors.white,
+              fontSize: 16.sp,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+      );
+    }
+
+    // Fallback to default image
+    return Container(
+      width: 37.h,
+      height: 37.h,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        image: DecorationImage(
+          image: AssetImage(AppAssets.profileImg),
+          fit: BoxFit.cover,
+        ),
+      ),
+    );
+  }
+
+  String _getInitials(String name) {
+    final parts = name.trim().split(' ');
+    if (parts.length >= 2) {
+      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+    } else if (parts.isNotEmpty) {
+      return parts[0].substring(0, parts[0].length >= 2 ? 2 : 1).toUpperCase();
+    }
+    return 'U';
   }
 }
