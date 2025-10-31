@@ -47,13 +47,38 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       final firebaseUser = FirebaseAuthService.getCurrentUser();
 
       if (firebaseUser != null) {
-        // User is logged in Firebase, get user model
-        final userModel = await FirebaseAuthService.getCurrentUserModel();
-        if (userModel != null) {
+        print('🔍 CheckAuthStatus: Firebase user found: ${firebaseUser.uid}');
+
+        // User is logged in Firebase, get user data from Firestore to preserve role
+        final firestoreUser = await authRepository.getUserFromFirestore(
+          firebaseUser.uid,
+        );
+
+        if (firestoreUser != null) {
+          print('✅ CheckAuthStatus: Firestore user found');
+          print('   Firestore user role: ${firestoreUser.role}');
+          print('   Firestore user email: ${firestoreUser.email}');
+
+          // Use Firestore data if exists (to preserve role), otherwise use auth data
+          final userModel = firestoreUser;
           // Save to cache
           await authRepository.saveUser(userModel, saveToFirestore: false);
+          print(
+            '💾 CheckAuthStatus: User saved to cache with role: ${userModel.role}',
+          );
           emit(Authenticated(userModel));
           return;
+        } else {
+          print('⚠️ CheckAuthStatus: No Firestore user found, using Auth user');
+          // Fallback: get user model from Firebase Auth if Firestore doesn't have it
+          final userModel = await FirebaseAuthService.getCurrentUserModel();
+          if (userModel != null) {
+            print('   Auth user role: ${userModel.role}');
+            // Save to cache
+            await authRepository.saveUser(userModel, saveToFirestore: false);
+            emit(Authenticated(userModel));
+            return;
+          }
         }
       }
 
@@ -87,13 +112,21 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         event.password,
       );
 
+
       // Get user data from Firestore to preserve role and other details
       final firestoreUser = await authRepository.getUserFromFirestore(
         authUser.id,
       );
 
+      if (firestoreUser != null) {
+      
+      } else {
+        print('   ⚠️ No Firestore user found, using Auth user data');
+      }
+
       // Use Firestore data if exists (to preserve role), otherwise use auth data
       final finalUser = firestoreUser ?? authUser;
+
 
       // Save to cache only (don't overwrite Firestore)
       final success = await authRepository.saveUser(
@@ -102,11 +135,16 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       );
 
       if (success) {
+        print(
+          '💾 Login: User saved to cache successfully with role: ${finalUser.role}',
+        );
         emit(Authenticated(finalUser));
       } else {
+        print('❌ Login: Failed to save user data to cache');
         emit(const AuthError('Failed to save user data'));
       }
     } catch (e) {
+      print('❌ Login error: $e');
       emit(AuthError(e.toString().replaceAll('Exception: ', '')));
     }
   }

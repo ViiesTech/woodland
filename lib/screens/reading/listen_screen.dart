@@ -3,21 +3,22 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:the_woodlands_series/components/button/primary_button.dart';
 import 'package:the_woodlands_series/components/resource/app_assets.dart';
+import 'package:the_woodlands_series/admin_panel/models/book_model.dart';
 import '../../components/resource/app_colors.dart';
 import '../../components/resource/app_textstyle.dart';
+import '../../bloc/auth/auth_bloc.dart';
+import '../../bloc/auth/auth_state.dart';
+import '../../models/user_model.dart';
 
 class ListenScreen extends StatefulWidget {
-  final String title;
-  final String author;
-  final String imageAsset;
+  final BookModel book;
 
   const ListenScreen({
     super.key,
-    required this.title,
-    required this.author,
-    required this.imageAsset,
+    required this.book,
   });
 
   @override
@@ -56,7 +57,16 @@ class _ListenScreenState extends State<ListenScreen> {
         centerTitle: true,
         actions: [
           Icon(Icons.bookmark_outline, color: Colors.white, size: 24.sp),
-          SizedBox(width: 20.w),
+          SizedBox(width: 12.w),
+          BlocBuilder<AuthBloc, AuthState>(
+            builder: (context, state) {
+              final user = state is Authenticated ? state.user : null;
+              return Padding(
+                padding: EdgeInsets.only(right: 16.w),
+                child: _buildUserAvatar(user),
+              );
+            },
+          ),
         ],
       ),
       body: SingleChildScrollView(
@@ -94,7 +104,9 @@ class _ListenScreenState extends State<ListenScreen> {
                 width: 200.w,
                 decoration: BoxDecoration(
                   image: DecorationImage(
-                    image: AssetImage(widget.imageAsset),
+                    image: widget.book.coverImageUrl.startsWith('http')
+                        ? NetworkImage(widget.book.coverImageUrl) as ImageProvider
+                        : AssetImage(widget.book.coverImageUrl),
                     fit: BoxFit.cover,
                   ),
                   borderRadius: BorderRadius.circular(16.r),
@@ -121,11 +133,24 @@ class _ListenScreenState extends State<ListenScreen> {
             Padding(
               padding: EdgeInsets.symmetric(horizontal: 20.w),
               child: Text(
-                'A Love Story Beneath The Rain That Healed Us',
+                widget.book.title,
                 style: AppTextStyles.lufgaLarge.copyWith(
                   color: Colors.white,
                   fontSize: 16.sp,
                   fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+            8.verticalSpace,
+            // Author
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 20.w),
+              child: Text(
+                widget.book.author,
+                style: AppTextStyles.regular.copyWith(
+                  color: Colors.grey[400],
+                  fontSize: 14.sp,
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -251,7 +276,7 @@ class _ListenScreenState extends State<ListenScreen> {
 
                   // Text Content
                   Text(
-                    'Far far away, behind the word mountains, far from the countries Vokalia and Consonantia, there live the blind texts. Separated they live in Bookmarksgrove right at the coast of the Semantics, a large language ocean. A small river named Duden flows by their place and supplies it with the necessary regelialia. It is a paradisematic country, in which roasted parts of sentences fly into your mouth.',
+                    widget.book.description,
                     style: AppTextStyles.regular.copyWith(
                       color: Colors.white,
                       fontSize: 14.sp,
@@ -280,5 +305,78 @@ class _ListenScreenState extends State<ListenScreen> {
         ),
       ),
     );
+  }
+
+  Widget _buildUserAvatar(UserModel? user) {
+    // If user has a profile image, show it
+    if (user?.profileImageUrl != null && user!.profileImageUrl!.isNotEmpty) {
+      return Container(
+        width: 32.h,
+        height: 32.h,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: AppColors.primaryColor.withOpacity(0.3),
+            width: 2,
+          ),
+          image: DecorationImage(
+            image: NetworkImage(user.profileImageUrl!),
+            fit: BoxFit.cover,
+          ),
+        ),
+      );
+    }
+
+    // If user has no image, show avatar with initials
+    if (user != null) {
+      return Container(
+        width: 32.h,
+        height: 32.h,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              AppColors.primaryColor,
+              AppColors.primaryColor.withOpacity(0.7),
+            ],
+          ),
+        ),
+        child: Center(
+          child: Text(
+            _getInitials(user.name),
+            style: AppTextStyles.lufgaMedium.copyWith(
+              color: Colors.white,
+              fontSize: 14.sp,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+      );
+    }
+
+    // Fallback to default image
+    return Container(
+      width: 32.h,
+      height: 32.h,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        image: DecorationImage(
+          image: AssetImage(AppAssets.profileImg),
+          fit: BoxFit.cover,
+        ),
+      ),
+    );
+  }
+
+  String _getInitials(String name) {
+    final parts = name.trim().split(' ');
+    if (parts.length >= 2) {
+      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+    } else if (parts.isNotEmpty) {
+      return parts[0].substring(0, parts[0].length >= 2 ? 2 : 1).toUpperCase();
+    }
+    return 'U';
   }
 }

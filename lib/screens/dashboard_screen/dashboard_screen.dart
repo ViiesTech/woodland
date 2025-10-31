@@ -22,24 +22,8 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   int _currentIndex = 0;
-  bool isAdmin = false;
 
-  @override
-  void initState() {
-    super.initState();
-    _checkUserRole();
-  }
-
-  void _checkUserRole() {
-    final authState = context.read<AuthBloc>().state;
-    if (authState is Authenticated) {
-      setState(() {
-        isAdmin = authState.user.role == 'admin';
-      });
-    }
-  }
-
-  List<Widget> _getScreens() {
+  List<Widget> _getScreens(bool isAdmin) {
     if (isAdmin) {
       return [
         const AdminHomeScreen(),
@@ -59,42 +43,46 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final screens = _getScreens();
+    return BlocBuilder<AuthBloc, AuthState>(
+      builder: (context, state) {
+        final isAdmin = state is Authenticated && state.user.role == 'admin';
+        final screens = _getScreens(isAdmin);
 
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: screens[_currentIndex],
-      bottomNavigationBar: Container(
-        height: 75.h,
-        decoration: BoxDecoration(
-          color: AppColors.bottomNavBackground,
-
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.3),
-              blurRadius: 10.r,
-              offset: Offset(0, -2.h),
-              spreadRadius: 0,
+        return Scaffold(
+          backgroundColor: Colors.black,
+          body: screens[_currentIndex],
+          bottomNavigationBar: Container(
+            height: 75.h,
+            decoration: BoxDecoration(
+              color: AppColors.bottomNavBackground,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.3),
+                  blurRadius: 10.r,
+                  offset: Offset(0, -2.h),
+                  spreadRadius: 0,
+                ),
+                BoxShadow(
+                  color: const Color(0xFF2A2A2A).withOpacity(0.5),
+                  blurRadius: 5.r,
+                  offset: Offset(0, -1.h),
+                  spreadRadius: 0,
+                ),
+              ],
             ),
-            BoxShadow(
-              color: const Color(0xFF2A2A2A).withOpacity(0.5),
-              blurRadius: 5.r,
-              offset: Offset(0, -1.h),
-              spreadRadius: 0,
+            child: Row(
+              children: [
+                Expanded(child: _buildNavItem(0, AppAssets.homeIcon, 'Home')),
+                Expanded(child: _buildNavItem(1, AppAssets.libraryIcon, 'Library')),
+                Expanded(
+                  child: _buildNavItem(2, AppAssets.messagesIcon, 'Messages'),
+                ),
+                Expanded(child: _buildNavItem(3, AppAssets.gamesIcon, 'Games')),
+              ],
             ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Expanded(child: _buildNavItem(0, AppAssets.homeIcon, 'Home')),
-            Expanded(child: _buildNavItem(1, AppAssets.libraryIcon, 'Library')),
-            Expanded(
-              child: _buildNavItem(2, AppAssets.messagesIcon, 'Messages'),
-            ),
-            Expanded(child: _buildNavItem(3, AppAssets.gamesIcon, 'Games')),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 

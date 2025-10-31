@@ -15,7 +15,7 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   runApp(
-    DevicePreview(enabled: !kReleaseMode, builder: (context) => const MyApp()),
+    DevicePreview(enabled: false, builder: (context) => const MyApp()),
   );
 }
 

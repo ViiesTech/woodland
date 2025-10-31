@@ -1,174 +1,326 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:flutter_svg/svg.dart';
-import 'package:the_woodlands_series/Components/resource/app_routers.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:the_woodlands_series/components/resource/app_colors.dart';
+import 'package:the_woodlands_series/components/resource/app_textstyle.dart';
 import 'package:the_woodlands_series/components/textfield/primary_textfield.dart';
-import 'package:the_woodlands_series/screens/profile/profile_screen.dart';
-import '../../components/resource/app_assets.dart';
-import '../../components/resource/app_colors.dart';
-import '../../components/resource/app_textstyle.dart';
-import 'chat_screen.dart';
+import 'package:the_woodlands_series/components/utils/three_dot_loader.dart';
+import 'package:the_woodlands_series/bloc/auth/auth_bloc.dart';
+import 'package:the_woodlands_series/bloc/auth/auth_state.dart';
+import 'package:the_woodlands_series/models/user_model.dart';
+import 'package:the_woodlands_series/models/chat_model.dart';
+import 'package:the_woodlands_series/screens/messages/chat_screen.dart';
+import 'package:the_woodlands_series/screens/messages/add_user_bottom_sheet.dart';
+import 'package:the_woodlands_series/services/chat_service.dart';
 
-class MessagesScreen extends StatelessWidget {
+class MessagesScreen extends StatefulWidget {
   const MessagesScreen({super.key});
 
   @override
+  State<MessagesScreen> createState() => _MessagesScreenState();
+}
+
+class _MessagesScreenState extends State<MessagesScreen> {
+  final TextEditingController _searchController = TextEditingController();
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  UserModel? currentUser;
+  Map<String, UserModel> cachedUsers =
+      {}; // Cache users to avoid repeated fetches
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCurrentUser();
+  }
+
+  void _loadCurrentUser() {
+    final authState = context.read<AuthBloc>().state;
+    if (authState is Authenticated) {
+      setState(() {
+        currentUser = authState.user;
+      });
+    }
+  }
+
+  // Fetch users efficiently in batch
+  Future<Map<String, UserModel>> _fetchUsersForChats(
+    List<ChatModel> chats,
+  ) async {
+    if (chats.isEmpty) return {};
+
+    // Get all unique user IDs from chats
+    final userIds = <String>{};
+    for (var chat in chats) {
+      final otherUserId = chat.participants.firstWhere(
+        (id) => id != currentUser?.id,
+        orElse: () => '',
+      );
+      if (otherUserId.isNotEmpty) {
+        userIds.add(otherUserId);
+      }
+    }
+
+    if (userIds.isEmpty) return {};
+
+    // Return cached users if we already have them
+    final uncachedIds = userIds
+        .where((id) => !cachedUsers.containsKey(id))
+        .toList();
+    if (uncachedIds.isEmpty) return cachedUsers;
+
+    try {
+      // Firestore 'in' query limit is 10, so batch the requests
+      for (int i = 0; i < uncachedIds.length; i += 10) {
+        final batch = uncachedIds.skip(i).take(10).toList();
+        final snapshot = await _firestore
+            .collection('users')
+            .where(FieldPath.documentId, whereIn: batch)
+            .get(GetOptions(source: Source.serverAndCache));
+
+        for (var doc in snapshot.docs) {
+          final user = UserModel.fromFirestore(doc.id, doc.data());
+          cachedUsers[doc.id] = user; // Add to cache
+        }
+      }
+
+      return {...cachedUsers}; // Return all cached users
+    } catch (e) {
+      print('Error fetching users: $e');
+      return cachedUsers;
+    }
+  }
+
+  void _showAddUserBottomSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.bgClr,
+      isScrollControlled: true,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20.r)),
+      ),
+      builder: (BuildContext bottomSheetContext) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.9,
+          minChildSize: 0.5,
+          maxChildSize: 0.95,
+          expand: false,
+          builder: (context, scrollController) {
+            return AddUserBottomSheet(
+              scrollController: scrollController,
+              currentUser: currentUser!,
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildUserAvatar(UserModel user) {
+    // If user has a profile image, show it
+    if (user.profileImageUrl != null && user.profileImageUrl!.isNotEmpty) {
+      return Container(
+        width: 50.w,
+        height: 50.w,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: AppColors.primaryColor.withOpacity(0.3),
+            width: 2,
+          ),
+          image: DecorationImage(
+            image: NetworkImage(user.profileImageUrl!),
+            fit: BoxFit.cover,
+          ),
+        ),
+      );
+    }
+
+    // Show avatar with initials
+    return Container(
+      width: 50.w,
+      height: 50.w,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            AppColors.primaryColor,
+            AppColors.primaryColor.withOpacity(0.7),
+          ],
+        ),
+      ),
+      child: Center(
+        child: Text(
+          _getInitials(user.name),
+          style: AppTextStyles.lufgaMedium.copyWith(
+            color: Colors.white,
+            fontSize: 18.sp,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _getInitials(String name) {
+    final parts = name.trim().split(' ');
+    if (parts.length >= 2) {
+      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+    } else if (parts.isNotEmpty) {
+      return parts[0].substring(0, parts[0].length >= 2 ? 2 : 1).toUpperCase();
+    }
+    return 'U';
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    if (currentUser == null) {
+      return Scaffold(
+        backgroundColor: AppColors.bgClr,
+        body: Center(
+          child: ThreeDotLoader(
+            color: AppColors.primaryColor,
+            size: 12.w,
+            spacing: 8.w,
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
+      backgroundColor: AppColors.bgClr,
       body: SafeArea(
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Header
             Padding(
               padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 16.h),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    'Messages',
-                    style: AppTextStyles.lufgaLarge.copyWith(
-                      color: Colors.white,
-                      fontSize: 24.sp,
-                    ),
-                  ),
-                  GestureDetector(
-                    onTap: () {
-                      AppRouter.routeTo(
-                        context,
-                        ProfileScreen(
-                          title: 'Profile',
-                          image: AppAssets.profileImg,
-                        ),
-                      );
-                    },
-                    child: Container(
-                      width: 37.h,
-                      height: 37.h,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        image: DecorationImage(
-                          image: AssetImage(AppAssets.profileImg),
-                          fit: BoxFit.cover,
-                        ),
+                  Expanded(
+                    child: Text(
+                      'Messages',
+                      style: AppTextStyles.lufgaLarge.copyWith(
+                        color: Colors.white,
+                        fontSize: 24.sp,
                       ),
                     ),
                   ),
+                  IconButton(
+                    onPressed: _showAddUserBottomSheet,
+                    icon: Container(
+                      padding: EdgeInsets.all(8.w),
+                      decoration: BoxDecoration(
+                        color: AppColors.primaryColor,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(Icons.add, color: Colors.white, size: 20.sp),
+                    ),
+                  ),
                 ],
               ),
             ),
-            16.verticalSpace,
 
-            // Search Bar
+            // Search field
             Padding(
               padding: EdgeInsets.symmetric(horizontal: 16.w),
               child: PrimaryTextField(
-                hint: 'Search Chat',
+                hint: 'Search messages...',
                 prefixIcon: Icon(Icons.search, size: 20.sp),
+                shadow: true,
               ),
             ),
+
             20.verticalSpace,
 
-            // Chat List
+            // Messages list with StreamBuilder + batch user fetching
             Expanded(
-              child: ListView(
-                padding: EdgeInsets.zero,
-                children: [
-                  _buildMessageItem(
-                    profileAsset: AppAssets.temp1,
-                    profileBgColor: Colors.yellow[700]!,
-                    name: 'Killan James',
-                    status: 'Typing...',
-                    statusColor: AppColors.primaryColor,
-                    time: '4:30 PM',
-                    unreadCount: 2,
-                    isOnline: true,
-                    context: context,
-                  ),
-                  _buildMessageItem(
-                    profileAsset: AppAssets.temp2,
-                    profileBgColor: Colors.brown[300]!,
-                    name: 'Design Team',
-                    lastMessage: 'Hello! Everyone',
-                    time: '9:36 AM',
-                    isRead: true,
-                    context: context,
-                  ),
-                  _buildMessageItem(
-                    profileAsset: AppAssets.temp3,
-                    profileBgColor: Colors.orange[300]!,
-                    name: 'Ahmed Medi',
-                    lastMessage: 'Wow really Cool 🔥',
-                    time: '1:15 AM',
-                    isSent: true,
-                    context: context,
-                  ),
-                  20.verticalSpace,
-                  Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 16.w),
-                    child: Row(
-                      children: [
-                        SvgPicture.asset(
-                          AppAssets.messagesIcon,
-                          height: 16.h,
-                          width: 16.w,
-                          colorFilter: ColorFilter.mode(
-                            Colors.white,
-                            BlendMode.srcIn,
-                          ),
+              child: StreamBuilder<List<ChatModel>>(
+                stream: ChatService.getUserChats(currentUser!.id),
+                builder: (context, chatSnapshot) {
+                  if (chatSnapshot.connectionState == ConnectionState.waiting) {
+                    return Center(
+                      child: ThreeDotLoader(
+                        color: AppColors.primaryColor,
+                        size: 12.w,
+                        spacing: 8.w,
+                      ),
+                    );
+                  }
+
+                  if (chatSnapshot.hasError) {
+                    return Center(
+                      child: Text(
+                        'Error loading chats',
+                        style: AppTextStyles.regular.copyWith(
+                          color: Colors.white.withOpacity(0.6),
+                          fontSize: 14.sp,
                         ),
-                        8.horizontalSpace,
-                        Text(
-                          'All Message',
-                          style: AppTextStyles.regular.copyWith(
-                            color: Colors.white,
-                            fontSize: 16.sp,
-                          ),
+                      ),
+                    );
+                  }
+
+                  final chats = chatSnapshot.data ?? [];
+
+                  if (chats.isEmpty) {
+                    return Center(
+                      child: Text(
+                        'No messages yet\nTap + to start chatting!',
+                        textAlign: TextAlign.center,
+                        style: AppTextStyles.regular.copyWith(
+                          color: Colors.white.withOpacity(0.6),
+                          fontSize: 14.sp,
                         ),
-                      ],
-                    ),
-                  ),
-                  10.verticalSpace,
-                  _buildMessageItem(
-                    profileAsset: AppAssets.temp4,
-                    profileBgColor: Colors.pink[300]!,
-                    name: 'Claudia Maudi',
-                    status: 'Typing...',
-                    statusColor: AppColors.primaryColor,
-                    time: '4:30 PM',
-                    isOnline: false,
-                    context: context,
-                  ),
-                  _buildMessageItem(
-                    profileAsset: AppAssets.temp5,
-                    profileBgColor: Colors.purple[300]!,
-                    name: 'Novita',
-                    lastMessage: 'yah, nice design',
-                    time: '4:30 PM',
-                    unreadCount: 2,
-                    isOnline: true,
-                    context: context,
-                  ),
-                  _buildMessageItem(
-                    profileAsset: AppAssets.temp6,
-                    profileBgColor: Colors.blue[300]!,
-                    name: 'Milie Nose',
-                    lastMessage: 'Awesome 🔥',
-                    time: '8:20 PM',
-                    unreadCount: 1,
-                    isOnline: true,
-                    context: context,
-                  ),
-                  _buildMessageItem(
-                    profileAsset: AppAssets.temp7,
-                    profileBgColor: Colors.green[700]!,
-                    name: 'Ikhsan SD',
-                    isVoiceMessage: true,
-                    time: 'yesterday',
-                    isOnline: false,
-                    context: context,
-                  ),
-                ],
+                      ),
+                    );
+                  }
+
+                  // Use FutureBuilder to batch fetch all users at once
+                  return FutureBuilder<Map<String, UserModel>>(
+                    future: _fetchUsersForChats(chats),
+                    builder: (context, userSnapshot) {
+                      if (userSnapshot.connectionState ==
+                          ConnectionState.waiting) {
+                        return Center(
+                          child: ThreeDotLoader(
+                            color: AppColors.primaryColor,
+                            size: 12.w,
+                            spacing: 8.w,
+                          ),
+                        );
+                      }
+
+                      final users = userSnapshot.data ?? {};
+
+                      return ListView.builder(
+                        padding: EdgeInsets.symmetric(horizontal: 16.w),
+                        itemCount: chats.length,
+                        itemBuilder: (context, index) {
+                          final chat = chats[index];
+                          final otherUserId = chat.participants.firstWhere(
+                            (id) => id != currentUser!.id,
+                            orElse: () => '',
+                          );
+
+                          final otherUser = users[otherUserId];
+                          if (otherUser == null) {
+                            return SizedBox.shrink();
+                          }
+
+                          return _buildChatItem(chat, otherUser);
+                        },
+                      );
+                    },
+                  );
+                },
               ),
             ),
           ],
@@ -177,56 +329,60 @@ class MessagesScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildMessageItem({
-    required String profileAsset,
-    required Color profileBgColor,
-    required String name,
-    String? lastMessage,
-    String? status,
-    Color? statusColor,
-    required String time,
-    int? unreadCount,
-    bool isRead = false,
-    bool isSent = false,
-    bool isVoiceMessage = false,
-    bool isOnline = false,
-    required BuildContext context,
-  }) {
+  Widget _buildChatItem(ChatModel chat, UserModel otherUser) {
+    final otherUserId = otherUser.id;
+    final isTyping = chat.isTyping[otherUserId] ?? false;
+    final unreadCount = chat.unreadCount[currentUser!.id] ?? 0;
+    final isMyMessage = chat.lastMessageSenderId == currentUser!.id;
+
     return GestureDetector(
-      onTap: () {
-        AppRouter.routeTo(
+      onTap: () async {
+        // Mark messages as read when opening chat
+        await ChatService.markMessagesAsRead(
+          chatId: chat.id,
+          userId: currentUser!.id,
+        );
+
+        Navigator.push(
           context,
-          ChatScreen(profileAsset: profileAsset, name: name),
+          MaterialPageRoute(builder: (context) => ChatScreen(user: otherUser)),
         );
       },
-      child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 10.h),
+      child: Container(
+        margin: EdgeInsets.only(bottom: 12.h),
+        padding: EdgeInsets.all(12.w),
+        decoration: BoxDecoration(
+          color: AppColors.boxClr,
+          borderRadius: BorderRadius.circular(12.r),
+        ),
         child: Row(
           children: [
+            // Avatar with online indicator
             Stack(
               children: [
-                CircleAvatar(
-                  radius: 25.r,
-                  backgroundColor: profileBgColor,
-                  backgroundImage: AssetImage(profileAsset),
-                ),
-                if (isOnline)
-                  Positioned(
-                    bottom: 0,
-                    right: 0,
-                    child: Container(
-                      width: 10.w,
-                      height: 10.h,
-                      decoration: BoxDecoration(
-                        color: Colors.green,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: AppColors.bgClr,
-                          width: 1.5.w,
+                _buildUserAvatar(otherUser),
+                // Online indicator
+                Positioned(
+                  bottom: 0,
+                  right: 0,
+                  child: StreamBuilder<bool>(
+                    stream: ChatService.getUserOnlineStatus(otherUserId),
+                    builder: (context, onlineSnapshot) {
+                      final isOnline = onlineSnapshot.data ?? false;
+                      if (!isOnline) return SizedBox.shrink();
+
+                      return Container(
+                        width: 12.w,
+                        height: 12.w,
+                        decoration: BoxDecoration(
+                          color: Colors.green,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: AppColors.boxClr, width: 2),
                         ),
-                      ),
-                    ),
+                      );
+                    },
                   ),
+                ),
               ],
             ),
             12.horizontalSpace,
@@ -235,93 +391,88 @@ class MessagesScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    name,
+                    otherUser.name,
                     style: AppTextStyles.medium.copyWith(
                       color: Colors.white,
                       fontSize: 16.sp,
                     ),
                   ),
                   4.verticalSpace,
-                  if (status != null)
-                    Text(
-                      status,
-                      style: AppTextStyles.regular.copyWith(
-                        color: statusColor ?? Colors.grey[400],
-                        fontSize: 12.sp,
-                      ),
-                    )
-                  else if (isVoiceMessage)
-                    Row(
-                      children: [
-                        Icon(Icons.mic, color: Colors.grey[400], size: 16.sp),
-                        4.horizontalSpace,
-                        Text(
-                          'Voice message',
-                          style: AppTextStyles.regular.copyWith(
-                            color: Colors.grey[400],
-                            fontSize: 14.sp,
-                          ),
-                        ),
-                      ],
-                    )
-                  else if (lastMessage != null)
-                    Text(
-                      lastMessage,
-                      style: AppTextStyles.regular.copyWith(
-                        color: Colors.white,
-                        fontSize: 12.sp,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                  Text(
+                    isTyping
+                        ? 'Typing...'
+                        : (chat.lastMessage ?? 'No messages yet'),
+                    style: AppTextStyles.regular.copyWith(
+                      color: isTyping
+                          ? AppColors.primaryColor
+                          : Colors.grey[400],
+                      fontSize: 14.sp,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ],
               ),
             ),
-            12.horizontalSpace,
             Column(
               crossAxisAlignment: CrossAxisAlignment.end,
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  time,
-                  style: AppTextStyles.small.copyWith(
-                    color: Colors.grey[400],
-                    fontSize: 10.sp,
-                  ),
-                ),
-                4.verticalSpace,
-                if (unreadCount != null && unreadCount > 0)
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.red,
-                      shape: BoxShape.circle,
+                if (chat.lastMessageTime != null)
+                  Text(
+                    _formatTime(chat.lastMessageTime!),
+                    style: AppTextStyles.small.copyWith(
+                      color: Colors.grey[400],
+                      fontSize: 12.sp,
                     ),
-                    alignment: Alignment.center,
-                    child: Padding(
-                      padding: EdgeInsets.all(4.w),
-                      child: Text(
-                        unreadCount.toString(),
-                        style: AppTextStyles.small.copyWith(
-                          color: Colors.white,
-                          fontSize: 10.sp,
-                          fontWeight: FontWeight.bold,
-                        ),
+                  ),
+                8.verticalSpace,
+                if (unreadCount > 0)
+                  Container(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 8.w,
+                      vertical: 4.h,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryColor,
+                      borderRadius: BorderRadius.circular(12.r),
+                    ),
+                    child: Text(
+                      unreadCount.toString(),
+                      style: AppTextStyles.small.copyWith(
+                        color: Colors.white,
+                        fontSize: 12.sp,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
                   )
-                else if (isRead)
+                else if (isMyMessage)
                   Icon(
                     Icons.done_all,
                     color: AppColors.primaryColor,
-                    size: 15.sp,
-                  )
-                else if (isSent)
-                  Icon(Icons.done, color: Colors.grey[400], size: 15.sp),
+                    size: 16.sp,
+                  ),
               ],
             ),
           ],
         ),
       ),
     );
+  }
+
+  String _formatTime(DateTime time) {
+    final now = DateTime.now();
+    final difference = now.difference(time);
+
+    if (difference.inDays > 0) {
+      if (difference.inDays == 1) return 'Yesterday';
+      if (difference.inDays < 7) return '${difference.inDays}d ago';
+      return '${time.day}/${time.month}';
+    } else if (difference.inHours > 0) {
+      return '${difference.inHours}h ago';
+    } else if (difference.inMinutes > 0) {
+      return '${difference.inMinutes}m ago';
+    } else {
+      return 'Just now';
+    }
   }
 }

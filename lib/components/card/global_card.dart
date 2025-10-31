@@ -26,22 +26,7 @@ class GlobalCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => BookDetailScreen(
-              title: title,
-              author: author,
-              imageAsset: imageAsset,
-              listenTime: listenTime,
-              readTime: readTime,
-            ),
-          ),
-        );
-      },
-      child: SizedBox(
+    return SizedBox(
         width: 122.w,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -53,16 +38,58 @@ class GlobalCard extends StatelessWidget {
               ),
               child: Stack(
                 children: [
-                  // Background Image
+                  // Background Image - supports both asset and network
                   Container(
                     height: 119.h,
                     decoration: BoxDecoration(
-                      image: DecorationImage(
-                        image: AssetImage(imageAsset),
-                        fit: BoxFit.cover,
-                      ),
+                      image: imageAsset.startsWith('http')
+                          ? DecorationImage(
+                              image: NetworkImage(imageAsset),
+                              fit: BoxFit.cover,
+                              onError: (exception, stackTrace) {
+                                // Handle error - show placeholder
+                              },
+                            )
+                          : DecorationImage(
+                              image: AssetImage(imageAsset),
+                              fit: BoxFit.cover,
+                            ),
                       borderRadius: BorderRadius.circular(14.r),
                     ),
+                    child: imageAsset.startsWith('http')
+                        ? ClipRRect(
+                            borderRadius: BorderRadius.circular(14.r),
+                            child: Image.network(
+                              imageAsset,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) {
+                                return Container(
+                                  color: Colors.grey[800],
+                                  child: Icon(
+                                    Icons.image_not_supported,
+                                    color: Colors.grey[600],
+                                    size: 40.sp,
+                                  ),
+                                );
+                              },
+                              loadingBuilder: (context, child, loadingProgress) {
+                                if (loadingProgress == null) return child;
+                                return Container(
+                                  color: Colors.grey[800],
+                                  child: Center(
+                                    child: CircularProgressIndicator(
+                                      value: loadingProgress.expectedTotalBytes != null
+                                          ? loadingProgress.cumulativeBytesLoaded /
+                                              loadingProgress.expectedTotalBytes!
+                                          : null,
+                                      color: Colors.orange,
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          )
+                        : null,
                   ),
                   // Blur Overlay
                   if (blur)
@@ -146,7 +173,6 @@ class GlobalCard extends StatelessWidget {
             ),
           ],
         ),
-      ),
     );
   }
 }

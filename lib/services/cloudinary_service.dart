@@ -13,7 +13,8 @@ class CloudinaryUploadResult {
 class CloudinaryService {
   /// Upload image to Cloudinary
   /// Returns the secure URL and delete token of the uploaded image
-  static Future<CloudinaryUploadResult?> uploadImage(File imageFile) async {
+  /// [folder] - Optional folder path in Cloudinary (defaults to CloudinaryConfig.uploadFolder)
+  static Future<CloudinaryUploadResult?> uploadImage(File imageFile, {String? folder}) async {
     print('═══════════════════════════════════════════════════');
     print('🚀 STARTING CLOUDINARY UPLOAD');
     print('═══════════════════════════════════════════════════');
@@ -23,7 +24,9 @@ class CloudinaryService {
       print('📊 File size: ${await imageFile.length()} bytes');
       print('☁️  Cloud name: ${CloudinaryConfig.cloudName}');
       print('🔧 Upload preset: ${CloudinaryConfig.uploadPreset}');
-      print('📂 Folder: ${CloudinaryConfig.uploadFolder}');
+      
+      final uploadFolder = folder ?? CloudinaryConfig.uploadFolder;
+      print('📂 Folder: $uploadFolder');
 
       final url = Uri.parse(
         'https://api.cloudinary.com/v1_1/${CloudinaryConfig.cloudName}/image/upload',
@@ -37,8 +40,8 @@ class CloudinaryService {
       print('✅ Added upload_preset');
 
       // Add folder (optional)
-      if (CloudinaryConfig.uploadFolder.isNotEmpty) {
-        request.fields['folder'] = CloudinaryConfig.uploadFolder;
+      if (uploadFolder.isNotEmpty) {
+        request.fields['folder'] = uploadFolder;
         print('✅ Added folder');
       }
 
@@ -124,6 +127,107 @@ class CloudinaryService {
           print('Could not parse error as JSON');
         }
 
+        return null;
+      }
+    } catch (e, stackTrace) {
+      print('❌ EXCEPTION OCCURRED!');
+      print('Error: $e');
+      print('Stack trace: $stackTrace');
+      return null;
+    } finally {
+      print('═══════════════════════════════════════════════════');
+      print('🏁 UPLOAD PROCESS COMPLETED');
+      print('═══════════════════════════════════════════════════\n');
+    }
+  }
+
+  /// Upload PDF or any raw file to Cloudinary
+  /// Returns the secure URL and delete token of the uploaded file
+  static Future<CloudinaryUploadResult?> uploadFile(File file, {String? folder}) async {
+    print('═══════════════════════════════════════════════════');
+    print('🚀 STARTING CLOUDINARY FILE UPLOAD');
+    print('═══════════════════════════════════════════════════');
+
+    try {
+      print('📁 File path: ${file.path}');
+      print('📊 File size: ${await file.length()} bytes');
+      
+      // Determine resource type based on file extension
+      final fileName = file.path.toLowerCase();
+      String resourceType = 'raw';
+      if (fileName.endsWith('.pdf')) {
+        resourceType = 'raw'; // PDFs go to raw upload
+      } else if (fileName.endsWith('.mp3') || fileName.endsWith('.m4a') || fileName.endsWith('.wav')) {
+        resourceType = 'video'; // Audio files in Cloudinary use video endpoint
+      }
+
+      print('📦 Resource type: $resourceType');
+
+      final url = Uri.parse(
+        'https://api.cloudinary.com/v1_1/${CloudinaryConfig.cloudName}/$resourceType/upload',
+      );
+      print('🌐 Upload URL: $url');
+
+      final request = http.MultipartRequest('POST', url);
+
+      // Add upload preset
+      request.fields['upload_preset'] = CloudinaryConfig.uploadPreset;
+      print('✅ Added upload_preset');
+
+      // Add folder if provided
+      final uploadFolder = folder ?? 'book_files';
+      request.fields['folder'] = uploadFolder;
+      print('✅ Added folder: $uploadFolder');
+
+      print('📝 Request fields: ${request.fields}');
+
+      // Add the file
+      request.files.add(
+        await http.MultipartFile.fromPath('file', file.path),
+      );
+      print('✅ Added file to request');
+
+      // Send the request
+      print('📤 Sending request to Cloudinary...');
+      final response = await request.send();
+      print('📥 Response received! Status: ${response.statusCode}');
+
+      // Get response body
+      final responseData = await response.stream.toBytes();
+      final responseString = String.fromCharCodes(responseData);
+      print('📄 Response length: ${responseString.length} characters');
+
+      if (response.statusCode == 200) {
+        print('✅ UPLOAD SUCCESSFUL!');
+        final jsonMap = json.decode(responseString);
+
+        print('───────────────────────────────────────────────────');
+        print('📦 Response data:');
+        jsonMap.forEach((key, value) {
+          print('   $key: $value');
+        });
+        print('───────────────────────────────────────────────────');
+
+        // Return both the secure URL and delete token
+        final secureUrl = jsonMap['secure_url'] as String?;
+        final deleteToken = jsonMap['delete_token'] as String?;
+
+        print('🔗 Secure URL: $secureUrl');
+        print('🔑 Delete Token: $deleteToken');
+
+        if (secureUrl != null) {
+          return CloudinaryUploadResult(
+            url: secureUrl,
+            deleteToken: deleteToken ?? '',
+          );
+        }
+
+        print('❌ Missing secure_url in response!');
+        return null;
+      } else {
+        print('❌ UPLOAD FAILED!');
+        print('Status code: ${response.statusCode}');
+        print('Response body: $responseString');
         return null;
       }
     } catch (e, stackTrace) {

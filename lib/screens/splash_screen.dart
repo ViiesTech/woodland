@@ -58,6 +58,7 @@ class _SplashScreenState extends State<SplashScreen>
       listener: (context, state) {
         if (state is Authenticated) {
           // User is logged in, navigate to dashboard
+          // DashboardScreen will automatically show AdminHomeScreen for admins
           AppRouter.clearStack(context, const DashboardScreen());
         } else if (state is Unauthenticated) {
           // User is not logged in, navigate to login screen

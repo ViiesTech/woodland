@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -5,62 +6,67 @@ import 'package:the_woodlands_series/components/button/primary_button.dart';
 import 'package:the_woodlands_series/components/resource/app_assets.dart';
 import 'package:the_woodlands_series/components/resource/app_colors.dart';
 import 'package:the_woodlands_series/components/resource/app_textstyle.dart';
+import 'package:the_woodlands_series/components/resource/app_routers.dart';
 import 'package:the_woodlands_series/components/card/global_card.dart';
+import 'package:the_woodlands_series/models/game_model.dart';
+import 'package:the_woodlands_series/services/game_service.dart';
+import 'play_game_screen.dart';
 
 class GameDetailScreen extends StatefulWidget {
-  final String title;
-  final String image;
-  const GameDetailScreen({super.key, required this.title, required this.image});
+  final GameModel game;
+
+  const GameDetailScreen({super.key, required this.game});
 
   @override
   State<GameDetailScreen> createState() => _GameDetailScreenState();
 }
 
 class _GameDetailScreenState extends State<GameDetailScreen> {
-  final List<Map<String, String>> trendingBooks = [
-    {
-      'title': 'A PIRATE SCENT OF A LADY ORCHARD 2',
-      'author': 'Mark McAllister',
-      'imageAsset': AppAssets.tempGame4,
-      'listenTime': '5m',
-      'readTime': '8m',
-    },
-    {
-      'title': 'THE ENCHANTED FOREST ADVENTURE',
-      'author': 'Sarah Johnson',
-      'imageAsset': AppAssets.tempGame5,
-      'listenTime': '7m',
-      'readTime': '12m',
-    },
-    {
-      'title': 'MYSTERY OF THE DARK WOODS',
-      'author': 'David Wilson',
-      'imageAsset': AppAssets.tempGame6,
-      'listenTime': '4m',
-      'readTime': '6m',
-    },
-    {
-      'title': 'THE LOST TREASURE HUNT',
-      'author': 'Emily Brown',
-      'imageAsset': AppAssets.tempGame4,
-      'listenTime': '9m',
-      'readTime': '15m',
-    },
-    {
-      'title': 'FANTASY REALM CHRONICLES',
-      'author': 'Michael Davis',
-      'imageAsset': AppAssets.tempGame5,
-      'listenTime': '6m',
-      'readTime': '10m',
-    },
-    {
-      'title': 'ADVENTURE IN THE MOUNTAINS',
-      'author': 'Lisa Anderson',
-      'imageAsset': AppAssets.tempGame6,
-      'listenTime': '8m',
-      'readTime': '14m',
-    },
-  ];
+  List<GameModel> similarGames = [];
+  StreamSubscription<List<GameModel>>? _gamesSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSimilarGames();
+  }
+
+  void _loadSimilarGames() {
+    // Load games from the same category, excluding the current game
+    _gamesSubscription = GameService.getAllGames().listen((games) {
+      if (mounted) {
+        setState(() {
+          similarGames = games
+              .where(
+                (game) =>
+                    game.id != widget.game.id &&
+                    game.category == widget.game.category,
+              )
+              .take(6)
+              .toList();
+
+          // If not enough games in same category, fill with other games
+          if (similarGames.length < 6) {
+            final otherGames = games
+                .where(
+                  (game) =>
+                      game.id != widget.game.id &&
+                      !similarGames.any((g) => g.id == game.id),
+                )
+                .take(6 - similarGames.length)
+                .toList();
+            similarGames.addAll(otherGames);
+          }
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _gamesSubscription?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -94,8 +100,14 @@ class _GameDetailScreenState extends State<GameDetailScreen> {
                     child: Container(
                       decoration: BoxDecoration(
                         image: DecorationImage(
-                          image: AssetImage(widget.image),
+                          image: widget.game.imageUrl.startsWith('http')
+                              ? NetworkImage(widget.game.imageUrl)
+                              : AssetImage(widget.game.imageUrl)
+                                    as ImageProvider,
                           fit: BoxFit.cover,
+                          onError: (exception, stackTrace) {
+                            // Fallback handled by errorBuilder if needed
+                          },
                         ),
                       ),
                       child: BackdropFilter(
@@ -141,7 +153,45 @@ class _GameDetailScreenState extends State<GameDetailScreen> {
                           ),
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(20.r),
-                            child: Image.asset(widget.image, fit: BoxFit.cover),
+                            child: widget.game.imageUrl.startsWith('http')
+                                ? Image.network(
+                                    widget.game.imageUrl,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) {
+                                      return Container(
+                                        color: Colors.grey[800],
+                                        child: Icon(
+                                          Icons.image_not_supported,
+                                          color: Colors.grey[600],
+                                          size: 60.sp,
+                                        ),
+                                      );
+                                    },
+                                    loadingBuilder: (context, child, loadingProgress) {
+                                      if (loadingProgress == null) return child;
+                                      return Container(
+                                        color: Colors.grey[800],
+                                        child: Center(
+                                          child: CircularProgressIndicator(
+                                            value:
+                                                loadingProgress
+                                                        .expectedTotalBytes !=
+                                                    null
+                                                ? loadingProgress
+                                                          .cumulativeBytesLoaded /
+                                                      loadingProgress
+                                                          .expectedTotalBytes!
+                                                : null,
+                                            color: Colors.orange,
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                  )
+                                : Image.asset(
+                                    widget.game.imageUrl,
+                                    fit: BoxFit.cover,
+                                  ),
                           ),
                         ),
 
@@ -151,7 +201,7 @@ class _GameDetailScreenState extends State<GameDetailScreen> {
                         SizedBox(
                           width: 350.w,
                           child: Text(
-                            widget.title,
+                            widget.game.title,
                             style: AppTextStyles.lufgaLarge.copyWith(
                               color: Colors.white,
                               fontSize: 20.sp,
@@ -163,12 +213,47 @@ class _GameDetailScreenState extends State<GameDetailScreen> {
                           ),
                         ),
 
+                        // Game subtitle
+                        if (widget.game.subtitle.isNotEmpty) ...[
+                          8.verticalSpace,
+                          SizedBox(
+                            width: 350.w,
+                            child: Text(
+                              widget.game.subtitle,
+                              style: AppTextStyles.medium.copyWith(
+                                color: Colors.white.withOpacity(0.8),
+                                fontSize: 14.sp,
+                              ),
+                              textAlign: TextAlign.center,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+
                         16.verticalSpace,
 
                         PrimaryButton(
                           buttonWidth: 250.w,
                           title: 'Play Game',
-                          onTap: () {},
+                          onTap: () {
+                            if (widget.game.gameUrl.isNotEmpty) {
+                              AppRouter.routeTo(
+                                context,
+                                PlayGameScreen(
+                                  gameUrl: widget.game.gameUrl,
+                                  gameTitle: widget.game.title,
+                                ),
+                              );
+                            } else {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Game URL not available'),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                            }
+                          },
                         ),
                         16.verticalSpace,
                       ],
@@ -188,16 +273,17 @@ class _GameDetailScreenState extends State<GameDetailScreen> {
                   children: [
                     40.verticalSpace,
 
-                    // Chapter 2
-                    Text(
-                      'Chapter 2',
-                      style: AppTextStyles.medium.copyWith(
-                        color: AppColors.primaryColor,
-                        fontSize: 14.sp,
+                    // Category
+                    if (widget.game.category.isNotEmpty)
+                      Text(
+                        widget.game.category,
+                        style: AppTextStyles.medium.copyWith(
+                          color: AppColors.primaryColor,
+                          fontSize: 14.sp,
+                        ),
                       ),
-                    ),
 
-                    8.verticalSpace,
+                    if (widget.game.category.isNotEmpty) 8.verticalSpace,
 
                     // About this Game
                     Text(
@@ -213,7 +299,9 @@ class _GameDetailScreenState extends State<GameDetailScreen> {
 
                     // Description
                     Text(
-                      'Getting Along (2022) describes the importance of workplace interactions and their effecs on productivity and creaiviy.',
+                      widget.game.description.isNotEmpty
+                          ? widget.game.description
+                          : 'No description available.',
                       style: AppTextStyles.regular.copyWith(
                         color: Colors.white,
                         fontSize: 14.sp,
@@ -239,29 +327,48 @@ class _GameDetailScreenState extends State<GameDetailScreen> {
                           ],
                         ),
                         16.verticalSpace,
-                        GridView.builder(
-                          shrinkWrap: true,
-                          physics: NeverScrollableScrollPhysics(),
-                          padding: EdgeInsets.zero,
-                          gridDelegate:
-                              SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: 3,
-                                crossAxisSpacing: 16.w,
-                                mainAxisSpacing: 16.h,
-                                childAspectRatio: 0.43,
+                        similarGames.isEmpty
+                            ? Padding(
+                                padding: EdgeInsets.symmetric(vertical: 20.h),
+                                child: Text(
+                                  'No similar games available',
+                                  style: AppTextStyles.regular.copyWith(
+                                    color: Colors.white.withOpacity(0.7),
+                                    fontSize: 14.sp,
+                                  ),
+                                ),
+                              )
+                            : GridView.builder(
+                                shrinkWrap: true,
+                                physics: NeverScrollableScrollPhysics(),
+                                padding: EdgeInsets.zero,
+                                gridDelegate:
+                                    SliverGridDelegateWithFixedCrossAxisCount(
+                                      crossAxisCount: 3,
+                                      crossAxisSpacing: 16.w,
+                                      mainAxisSpacing: 16.h,
+                                      childAspectRatio: 0.43,
+                                    ),
+                                itemCount: similarGames.length,
+                                itemBuilder: (context, index) {
+                                  final game = similarGames[index];
+                                  return GestureDetector(
+                                    onTap: () {
+                                      AppRouter.routeTo(
+                                        context,
+                                        GameDetailScreen(game: game),
+                                      );
+                                    },
+                                    child: GlobalCard(
+                                      title: game.title,
+                                      author: game.subtitle,
+                                      imageAsset: game.imageUrl,
+                                      listenTime: '',
+                                      readTime: '',
+                                    ),
+                                  );
+                                },
                               ),
-                          itemCount: trendingBooks.length,
-                          itemBuilder: (context, index) {
-                            final book = trendingBooks[index];
-                            return GlobalCard(
-                              title: book['title']!,
-                              author: book['author']!,
-                              imageAsset: book['imageAsset']!,
-                              listenTime: book['listenTime']!,
-                              readTime: book['readTime']!,
-                            );
-                          },
-                        ),
                       ],
                     ),
 

@@ -1,0 +1,5 @@
+AddType application/wasm .wasm
+AddType application/javascript .js
+AddType application/octet-stream .mem
+AddType application/octet-stream .data
+AddType application/json .json

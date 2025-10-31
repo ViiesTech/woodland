@@ -1,22 +1,64 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:the_woodlands_series/components/button/primary_button.dart';
+import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 import 'package:the_woodlands_series/components/resource/app_routers.dart';
+import 'package:the_woodlands_series/admin_panel/models/book_model.dart';
 import '../../components/resource/app_colors.dart';
 import '../../components/resource/app_textstyle.dart';
+import '../../components/utils/three_dot_loader.dart';
 
-class ReadingScreen extends StatelessWidget {
-  final String title;
-  final String author;
-  final String imageAsset;
+class ReadingScreen extends StatefulWidget {
+  final BookModel book;
 
-  const ReadingScreen({
-    super.key,
-    required this.title,
-    required this.author,
-    required this.imageAsset,
-  });
+  const ReadingScreen({super.key, required this.book});
+
+  @override
+  State<ReadingScreen> createState() => _ReadingScreenState();
+}
+
+class _ReadingScreenState extends State<ReadingScreen> {
+  PdfViewerController? _pdfViewerController;
+  int _currentPage = 1;
+  int _totalPages = 2; // Default to 2 pages for demo text
+  bool _isLoading = true;
+  bool _useDemoText = false;
+
+  @override
+  void initState() {
+    super.initState();
+    print('🔵 ReadingScreen initialized');
+    print('🔵 Book PDF URL: ${widget.book.pdfUrl}');
+
+    // Set a timeout to show demo text if PDF doesn't load
+    Future.delayed(Duration(seconds: 10), () {
+      if (mounted && _isLoading) {
+        print('⏰ PDF loading timeout - showing demo text');
+        setState(() {
+          _isLoading = false;
+          _useDemoText = true;
+        });
+      }
+    });
+  }
+
+  // Demo text content for 2 pages
+  final List<String> _demoPages = [
+    '''Chapter 1: The Beginning
+
+Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
+
+Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
+
+Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam, eaque ipsa quae ab illo inventore veritatis et quasi architecto beatae vitae dicta sunt explicabo.''',
+    '''Chapter 2: The Journey Continues
+
+Nemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit, sed quia consequuntur magni dolores eos qui ratione voluptatem sequi nesciunt. Neque porro quisquam est, qui dolorem ipsum quia dolor sit amet.
+
+At vero eos et accusamus et iusto odio dignissimos ducimus qui blanditiis praesentium voluptatum deleniti atque corrupti quos dolores et quas molestias excepturi sint occaecati cupiditate non provident.
+
+Similique sunt in culpa qui officia deserunt mollitia animi, id est laborum et dolorum fuga. Et harum quidem rerum facilis est et expedita distinctio. Nam libero tempore, cum soluta nobis est eligendi optio cumque nihil impedit quo minus id quod maxime placeat facere possimus.''',
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -41,7 +83,10 @@ class ReadingScreen extends StatelessWidget {
                   child: Container(
                     decoration: BoxDecoration(
                       image: DecorationImage(
-                        image: AssetImage(imageAsset),
+                        image: widget.book.coverImageUrl.startsWith('http')
+                            ? NetworkImage(widget.book.coverImageUrl)
+                                  as ImageProvider
+                            : AssetImage(widget.book.coverImageUrl),
                         fit: BoxFit.cover,
                       ),
                       borderRadius: BorderRadius.only(
@@ -96,14 +141,7 @@ class ReadingScreen extends StatelessWidget {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          'Chapter 2',
-                          style: AppTextStyles.medium.copyWith(
-                            color: AppColors.primaryColor,
-                            fontSize: 12.sp,
-                          ),
-                        ),
-                        Text(
-                          'The good guy',
+                          widget.book.title,
                           style: AppTextStyles.lufgaLarge.copyWith(
                             color: Colors.white,
                             fontSize: 16.sp,
@@ -111,7 +149,7 @@ class ReadingScreen extends StatelessWidget {
                           ),
                         ),
                         Text(
-                          'Mark mcallister',
+                          widget.book.author,
                           style: AppTextStyles.regular.copyWith(
                             color: Colors.grey[400],
                             fontSize: 12.sp,
@@ -125,127 +163,324 @@ class ReadingScreen extends StatelessWidget {
             ),
           ),
           Expanded(
-            child: SingleChildScrollView(
-              child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: 16.w),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    25.verticalSpace,
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Section Heading
-                        Text(
-                          'What is in it for me? Learn how to become an effective unofficial project manager',
-                          style: AppTextStyles.lufgaLarge.copyWith(
-                            color: Colors.white,
-                            fontSize: 16.sp,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        24.verticalSpace,
-
-                        // Body Text - First Paragraph
-                        Text(
-                          'Far far away, behind the word mountains, far from the countries Vokalia and Consonantia, there live the blind texts. Separated they live in Bookmarksgrove right at the coast of the Semantics, a large language ocean.',
-                          style: AppTextStyles.regular.copyWith(
-                            color: Colors.white,
-                            fontSize: 14.sp,
-                            height: 1.7,
-                          ),
-                          textAlign: TextAlign.justify,
-                        ),
-                        20.verticalSpace,
-
-                        // Second Paragraph
-                        Text(
-                          'A small river named Duden flows by their place and supplies it with the necessary regelialia. It is a paradisematic country, in which roasted parts of sentences fly into your mouth.',
-                          style: AppTextStyles.regular.copyWith(
-                            color: Colors.white,
-                            fontSize: 14.sp,
-                            height: 1.7,
-                          ),
-                          textAlign: TextAlign.justify,
-                        ),
-                        20.verticalSpace,
-
-                        // Third Paragraph
-                        Text(
-                          'Even the all-powerful Pointing has no control about the blind texts it is an almost unorthographic life One day however a small line of blind text by the name of Lorem Ipsum decided to leave for the far World of Grammar.',
-                          style: AppTextStyles.regular.copyWith(
-                            color: Colors.white,
-                            fontSize: 14.sp,
-                            height: 1.7,
-                          ),
-                          textAlign: TextAlign.justify,
-                        ),
-                        20.verticalSpace,
-
-                        // Fourth Paragraph
-                        Text(
-                          'The Big Oxmox advised her not to do so, because there were thousands of bad Commas, wild Question Marks and devious Semikoli, but the Little Blind Text didn\'t listen.',
-                          style: AppTextStyles.regular.copyWith(
-                            color: Colors.white,
-                            fontSize: 14.sp,
-                            height: 1.7,
-                          ),
-                          textAlign: TextAlign.justify,
-                        ),
-                        20.verticalSpace,
-
-                        // Fifth Paragraph
-                        Text(
-                          'She packed her seven versalia, put her initial into the belt and made herself on the way. When she reached the first hills of the Italic Mountains, she had a last view back on the skyline of her hometown Bookmarksgrove, the headline of Alphabet Village and the subline of her own road, the Line Lane.',
-                          style: AppTextStyles.regular.copyWith(
-                            color: Colors.white,
-                            fontSize: 14.sp,
-                            height: 1.7,
-                          ),
-                          textAlign: TextAlign.justify,
-                        ),
-                        20.verticalSpace,
-
-                        // Sixth Paragraph
-                        Text(
-                          'Pityful a rethoric question ran over her cheek, then she continued her way. On her way she met a copy. The copy warned the Little Blind Text, that where it came from it would have been rewritten a thousand times and everything that was left from its origin would be the word "and" and the Little Blind Text should turn around and return to its own, safe country.',
-                          style: AppTextStyles.regular.copyWith(
-                            color: Colors.white,
-                            fontSize: 14.sp,
-                            height: 1.7,
-                          ),
-                          textAlign: TextAlign.justify,
-                        ),
-
-                        30.verticalSpace,
-                      ],
+            child: _isLoading
+                ? Center(
+                    child: ThreeDotLoader(
+                      color: AppColors.primaryColor,
+                      size: 12.w,
+                      spacing: 8.w,
                     ),
+                  )
+                : _useDemoText
+                ? _buildDemoTextPagination()
+                : widget.book.pdfUrl != null && widget.book.pdfUrl!.isNotEmpty
+                ? _buildPDFViewer()
+                : _buildTextContentView(),
+          ),
+        ],
+      ),
+    );
+  }
 
-                    // Footer with Pagination and Next Button
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        // Pagination
-                        Text(
-                          'Page 1/20',
-                          style: AppTextStyles.regular.copyWith(
-                            color: AppColors.primaryColor,
-                            fontSize: 14.sp,
-                          ),
-                        ),
-                        20.verticalSpace,
+  Widget _buildPDFViewer() {
+    _pdfViewerController ??= PdfViewerController();
 
-                        // Next Page Button
-                        PrimaryButton(title: 'Next Page'),
-                      ],
+    print('📄 Building PDF viewer widget');
+    print('📄 PDF URL: ${widget.book.pdfUrl}');
+    print('📄 Controller: $_pdfViewerController');
+
+    // If no PDF URL, show demo text immediately
+    if (widget.book.pdfUrl == null || widget.book.pdfUrl!.isEmpty) {
+      print('⚠️ No PDF URL - showing demo text');
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+            _useDemoText = true;
+          });
+        }
+      });
+      return _buildDemoTextPagination();
+    }
+
+    return Column(
+      children: [
+        Expanded(
+          child: SfPdfViewer.network(
+            widget.book.pdfUrl!,
+            controller: _pdfViewerController,
+            enableDoubleTapZooming: true,
+            onDocumentLoaded: (PdfDocumentLoadedDetails details) {
+              print(
+                '✅ PDF loaded successfully! Total pages: ${details.document.pages.count}',
+              );
+              if (mounted) {
+                setState(() {
+                  _totalPages = details.document.pages.count;
+                  _isLoading = false;
+                  _useDemoText = false;
+                });
+              }
+            },
+            onDocumentLoadFailed: (PdfDocumentLoadFailedDetails details) {
+              print('❌ PDF load failed: ${details.error}');
+              print('❌ Error description: ${details.description}');
+              print('❌ PDF URL was: ${widget.book.pdfUrl}');
+              if (mounted) {
+                setState(() {
+                  _isLoading = false;
+                  _useDemoText = true; // Use demo text on error
+                  _currentPage = 1;
+                  _totalPages = 2;
+                });
+              }
+            },
+            onPageChanged: (PdfPageChangedDetails details) {
+              if (mounted) {
+                setState(() {
+                  _currentPage = details.newPageNumber;
+                });
+              }
+            },
+          ),
+        ),
+        // Pagination Controls
+        Container(
+          padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+          decoration: BoxDecoration(
+            color: AppColors.boxClr,
+            border: Border(
+              top: BorderSide(color: Colors.grey[800]!, width: 0.5),
+            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              // Previous Button
+              GestureDetector(
+                onTap: () {
+                  if (_currentPage > 1 && _pdfViewerController != null) {
+                    _pdfViewerController!.previousPage();
+                  }
+                },
+                child: Container(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 16.w,
+                    vertical: 8.h,
+                  ),
+                  decoration: BoxDecoration(
+                    color: _currentPage > 1
+                        ? AppColors.primaryColor
+                        : Colors.grey[800],
+                    borderRadius: BorderRadius.circular(8.r),
+                  ),
+                  child: Text(
+                    'Previous',
+                    style: AppTextStyles.medium.copyWith(
+                      color: _currentPage > 1 ? Colors.black : Colors.grey[600],
+                      fontSize: 14.sp,
                     ),
-                    30.verticalSpace,
-                  ],
+                  ),
                 ),
+              ),
+              // Page Info
+              Text(
+                _totalPages > 0
+                    ? 'Page $_currentPage/$_totalPages'
+                    : 'Loading...',
+                style: AppTextStyles.medium.copyWith(
+                  color: AppColors.primaryColor,
+                  fontSize: 14.sp,
+                ),
+              ),
+              // Next Button
+              GestureDetector(
+                onTap: () {
+                  if (_currentPage < _totalPages &&
+                      _pdfViewerController != null) {
+                    _pdfViewerController!.nextPage();
+                  }
+                },
+                child: Container(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 16.w,
+                    vertical: 8.h,
+                  ),
+                  decoration: BoxDecoration(
+                    color: _currentPage < _totalPages
+                        ? AppColors.primaryColor
+                        : Colors.grey[800],
+                    borderRadius: BorderRadius.circular(8.r),
+                  ),
+                  child: Text(
+                    'Next',
+                    style: AppTextStyles.medium.copyWith(
+                      color: _currentPage < _totalPages
+                          ? Colors.black
+                          : Colors.grey[600],
+                      fontSize: 14.sp,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDemoTextPagination() {
+    return Column(
+      children: [
+        Expanded(
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: EdgeInsets.all(20.w),
+              child: Text(
+                _demoPages[_currentPage - 1],
+                style: AppTextStyles.regular.copyWith(
+                  color: Colors.white,
+                  fontSize: 16.sp,
+                  height: 1.8,
+                ),
+                textAlign: TextAlign.justify,
               ),
             ),
           ),
-        ],
+        ),
+        // Pagination Controls
+        Container(
+          padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+          decoration: BoxDecoration(
+            color: AppColors.boxClr,
+            border: Border(
+              top: BorderSide(color: Colors.grey[800]!, width: 0.5),
+            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              // Previous Button
+              GestureDetector(
+                onTap: () {
+                  if (_currentPage > 1) {
+                    setState(() {
+                      _currentPage--;
+                    });
+                  }
+                },
+                child: Container(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 16.w,
+                    vertical: 8.h,
+                  ),
+                  decoration: BoxDecoration(
+                    color: _currentPage > 1
+                        ? AppColors.primaryColor
+                        : Colors.grey[800],
+                    borderRadius: BorderRadius.circular(8.r),
+                  ),
+                  child: Text(
+                    'Previous',
+                    style: AppTextStyles.medium.copyWith(
+                      color: _currentPage > 1 ? Colors.black : Colors.grey[600],
+                      fontSize: 14.sp,
+                    ),
+                  ),
+                ),
+              ),
+              // Page Info
+              Text(
+                'Page $_currentPage/$_totalPages',
+                style: AppTextStyles.medium.copyWith(
+                  color: AppColors.primaryColor,
+                  fontSize: 14.sp,
+                ),
+              ),
+              // Next Button
+              GestureDetector(
+                onTap: () {
+                  if (_currentPage < _totalPages) {
+                    setState(() {
+                      _currentPage++;
+                    });
+                  }
+                },
+                child: Container(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 16.w,
+                    vertical: 8.h,
+                  ),
+                  decoration: BoxDecoration(
+                    color: _currentPage < _totalPages
+                        ? AppColors.primaryColor
+                        : Colors.grey[800],
+                    borderRadius: BorderRadius.circular(8.r),
+                  ),
+                  child: Text(
+                    'Next',
+                    style: AppTextStyles.medium.copyWith(
+                      color: _currentPage < _totalPages
+                          ? Colors.black
+                          : Colors.grey[600],
+                      fontSize: 14.sp,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTextContentView() {
+    // Show text content if PDF is not available
+    return SingleChildScrollView(
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: 16.w),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            25.verticalSpace,
+            if (widget.book.content != null && widget.book.content!.isNotEmpty)
+              Text(
+                widget.book.content!,
+                style: AppTextStyles.regular.copyWith(
+                  color: Colors.white,
+                  fontSize: 14.sp,
+                  height: 1.7,
+                ),
+                textAlign: TextAlign.justify,
+              )
+            else
+              Center(
+                child: Padding(
+                  padding: EdgeInsets.all(32.w),
+                  child: Column(
+                    children: [
+                      Icon(
+                        Icons.book_outlined,
+                        size: 64.sp,
+                        color: Colors.grey[600],
+                      ),
+                      16.verticalSpace,
+                      Text(
+                        'No content available',
+                        style: AppTextStyles.medium.copyWith(
+                          color: Colors.grey[400],
+                          fontSize: 16.sp,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            30.verticalSpace,
+          ],
+        ),
       ),
     );
   }

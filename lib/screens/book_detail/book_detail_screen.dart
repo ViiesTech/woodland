@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:the_woodlands_series/Components/resource/app_routers.dart';
 import 'package:the_woodlands_series/components/resource/size_constants.dart';
-import 'package:the_woodlands_series/screens/reading/listen_screen.dart';
+import 'package:the_woodlands_series/admin_panel/models/book_model.dart';
 
 import '../../components/resource/app_colors.dart';
 import '../../components/resource/app_textstyle.dart';
@@ -12,20 +12,9 @@ import '../reading/reading_screen.dart';
 import '../reading/listen_screen.dart';
 
 class BookDetailScreen extends StatelessWidget {
-  final String title;
-  final String author;
-  final String imageAsset;
-  final String listenTime;
-  final String readTime;
+  final BookModel book;
 
-  const BookDetailScreen({
-    super.key,
-    required this.title,
-    required this.author,
-    required this.imageAsset,
-    required this.listenTime,
-    required this.readTime,
-  });
+  const BookDetailScreen({super.key, required this.book});
 
   @override
   Widget build(BuildContext context) {
@@ -42,10 +31,19 @@ class BookDetailScreen extends StatelessWidget {
                     height: 432.h,
                     width: double.infinity,
                     decoration: BoxDecoration(
-                      image: DecorationImage(
-                        image: AssetImage(imageAsset),
-                        fit: BoxFit.cover,
-                      ),
+                      color: AppColors.boxClr,
+                      image: book.coverImageUrl.isNotEmpty
+                          ? DecorationImage(
+                              image: book.coverImageUrl.startsWith('http')
+                                  ? NetworkImage(book.coverImageUrl)
+                                        as ImageProvider
+                                  : AssetImage(book.coverImageUrl),
+                              fit: BoxFit.cover,
+                              onError: (exception, stackTrace) {
+                                // Handle error silently
+                              },
+                            )
+                          : null,
                     ),
                     child: BackdropFilter(
                       filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
@@ -103,7 +101,7 @@ class BookDetailScreen extends StatelessWidget {
                               Padding(
                                 padding: EdgeInsets.symmetric(horizontal: 40.w),
                                 child: Text(
-                                  title,
+                                  book.title,
                                   style: AppTextStyles.lufgaLarge.copyWith(
                                     color: Colors.white,
                                     fontSize: 18.sp,
@@ -116,7 +114,7 @@ class BookDetailScreen extends StatelessWidget {
                               8.verticalSpace,
                               // Author
                               Text(
-                                author,
+                                book.author,
                                 style: AppTextStyles.regular.copyWith(
                                   color: Colors.grey[400],
                                   fontSize: 14.sp,
@@ -131,11 +129,7 @@ class BookDetailScreen extends StatelessWidget {
                                     onTap: () {
                                       AppRouter.routeTo(
                                         context,
-                                        ReadingScreen(
-                                          title: title,
-                                          author: author,
-                                          imageAsset: imageAsset,
-                                        ),
+                                        ReadingScreen(book: book),
                                       );
                                     },
                                     child: _buildActionButton(
@@ -148,11 +142,7 @@ class BookDetailScreen extends StatelessWidget {
                                     onTap: () {
                                       AppRouter.routeTo(
                                         context,
-                                        ListenScreen(
-                                          title: title,
-                                          author: author,
-                                          imageAsset: imageAsset,
-                                        ),
+                                        ListenScreen(book: book),
                                       );
                                     },
                                     child: _buildActionButton(
@@ -179,7 +169,7 @@ class BookDetailScreen extends StatelessWidget {
                                         ),
                                         5.horizontalSpace,
                                         Text(
-                                          '18 min',
+                                          '${book.readTime} min',
                                           style: AppTextStyles.medium.copyWith(
                                             color: AppColors.primaryColor,
                                             fontSize: 14.sp,
@@ -188,32 +178,6 @@ class BookDetailScreen extends StatelessWidget {
                                       ],
                                     ),
                                     16.verticalSpace,
-
-                                    // Project Management Section
-                                    Text(
-                                      'Project Management for the Unofficial Project Manager',
-                                      style: AppTextStyles.lufgaLarge.copyWith(
-                                        color: Colors.white,
-                                        fontSize: 16.sp,
-                                      ),
-                                    ),
-                                    8.verticalSpace,
-                                    Text(
-                                      'Kory Kogon, Suzette Blakemore, and James wood',
-                                      style: AppTextStyles.regular.copyWith(
-                                        color: Colors.white,
-                                        fontSize: 14.sp,
-                                      ),
-                                    ),
-                                    4.verticalSpace,
-                                    Text(
-                                      'A FranklinConvey Title',
-                                      style: AppTextStyles.regular.copyWith(
-                                        color: Colors.grey[400],
-                                        fontSize: 12.sp,
-                                      ),
-                                    ),
-                                    30.verticalSpace,
 
                                     // About this Book Section
                                     Text(
@@ -225,7 +189,7 @@ class BookDetailScreen extends StatelessWidget {
                                     ),
                                     8.verticalSpace,
                                     Text(
-                                      'Getting Along (2022) describes the importance of workplace interactions and their effects on productivity and creativity.',
+                                      book.description,
                                       style: AppTextStyles.regular.copyWith(
                                         color: Colors.grey[300],
                                         fontSize: 14.sp,
@@ -381,7 +345,10 @@ class BookDetailScreen extends StatelessWidget {
                         width: 159.w,
                         decoration: BoxDecoration(
                           image: DecorationImage(
-                            image: AssetImage(imageAsset),
+                            image: book.coverImageUrl.startsWith('http')
+                                ? NetworkImage(book.coverImageUrl)
+                                      as ImageProvider
+                                : AssetImage(book.coverImageUrl),
                             fit: BoxFit.cover,
                           ),
                           borderRadius: BorderRadius.circular(12.r),
