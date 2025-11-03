@@ -2,19 +2,119 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:the_woodlands_series/Components/resource/app_routers.dart';
 import 'package:the_woodlands_series/components/resource/size_constants.dart';
 import 'package:the_woodlands_series/admin_panel/models/book_model.dart';
 
 import '../../components/resource/app_colors.dart';
 import '../../components/resource/app_textstyle.dart';
+import '../../bloc/auth/auth_bloc.dart';
+import '../../bloc/auth/auth_state.dart';
 import '../reading/reading_screen.dart';
 import '../reading/listen_screen.dart';
+import '../../admin_panel/screens/edit_book_screen.dart';
+import '../../components/switch/custom_switch.dart';
+import '../../services/book_service.dart';
+import '../../components/utils/custom_toast.dart';
+import '../../services/bookmark_service.dart';
+import '../../services/viewed_books_service.dart';
 
-class BookDetailScreen extends StatelessWidget {
+class BookDetailScreen extends StatefulWidget {
   final BookModel book;
 
   const BookDetailScreen({super.key, required this.book});
+
+  @override
+  State<BookDetailScreen> createState() => _BookDetailScreenState();
+}
+
+class _BookDetailScreenState extends State<BookDetailScreen> {
+  late BookModel _book;
+  bool _isUpdating = false;
+  bool _isBookmarked = false;
+  String? _currentUserId;
+
+  @override
+  void initState() {
+    super.initState();
+    _book = widget.book;
+    _refreshBookData();
+    _loadBookmarkStatus();
+    _markBookAsViewed();
+  }
+
+  void _markBookAsViewed() {
+    final authState = context.read<AuthBloc>().state;
+    if (authState is Authenticated) {
+      ViewedBooksService.markBookAsViewed(
+        userId: authState.user.id,
+        bookId: _book.id,
+      ).then((_) {
+        // Refresh book data to get updated view count
+        if (mounted) {
+          _refreshBookData();
+        }
+      });
+    }
+  }
+
+  void _loadBookmarkStatus() {
+    final authState = context.read<AuthBloc>().state;
+    if (authState is Authenticated) {
+      _currentUserId = authState.user.id;
+      // Listen to bookmark status changes
+      BookmarkService.isBookmarkedStream(
+        userId: _currentUserId!,
+        bookId: _book.id,
+      ).listen((isBookmarked) {
+        if (mounted) {
+          setState(() {
+            _isBookmarked = isBookmarked;
+          });
+        }
+      });
+    }
+  }
+
+  Future<void> _toggleBookmark() async {
+    if (_currentUserId == null) {
+      CustomToast.showError(context, 'Please login to bookmark books');
+      return;
+    }
+
+    try {
+      final newStatus = await BookmarkService.toggleBookmark(
+        userId: _currentUserId!,
+        bookId: _book.id,
+        book: _book,
+      );
+
+      if (mounted) {
+        CustomToast.showSuccess(
+          context,
+          newStatus ? 'Book added to bookmarks' : 'Book removed from bookmarks',
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        CustomToast.showError(context, 'Error updating bookmark: $e');
+      }
+    }
+  }
+
+  Future<void> _refreshBookData() async {
+    try {
+      final updatedBook = await BookService.getBookById(widget.book.id);
+      if (updatedBook != null && mounted) {
+        setState(() {
+          _book = updatedBook;
+        });
+      }
+    } catch (e) {
+      print('Error refreshing book data: $e');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -32,12 +132,12 @@ class BookDetailScreen extends StatelessWidget {
                     width: double.infinity,
                     decoration: BoxDecoration(
                       color: AppColors.boxClr,
-                      image: book.coverImageUrl.isNotEmpty
+                      image: _book.coverImageUrl.isNotEmpty
                           ? DecorationImage(
-                              image: book.coverImageUrl.startsWith('http')
-                                  ? NetworkImage(book.coverImageUrl)
+                              image: _book.coverImageUrl.startsWith('http')
+                                  ? NetworkImage(_book.coverImageUrl)
                                         as ImageProvider
-                                  : AssetImage(book.coverImageUrl),
+                                  : AssetImage(_book.coverImageUrl),
                               fit: BoxFit.cover,
                               onError: (exception, stackTrace) {
                                 // Handle error silently
@@ -70,10 +170,49 @@ class BookDetailScreen extends StatelessWidget {
                             size: 20.sp,
                           ),
                         ),
-                        Icon(
-                          Icons.bookmark_outline,
-                          color: Colors.white,
-                          size: 20.sp,
+                        BlocBuilder<AuthBloc, AuthState>(
+                          builder: (context, state) {
+                            final isAdmin =
+                                state is Authenticated &&
+                                state.user.role == 'admin';
+                            if (isAdmin) {
+                              // Show Edit button for admin
+                              return GestureDetector(
+                                onTap: () async {
+                                  final result = await Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          EditBookScreen(book: _book),
+                                    ),
+                                  );
+                                  // Refresh book data when returning from edit screen
+                                  if (result == true || mounted) {
+                                    await _refreshBookData();
+                                  }
+                                },
+                                child: Icon(
+                                  Icons.edit,
+                                  color: Colors.white,
+                                  size: 20.sp,
+                                ),
+                              );
+                            } else {
+                              // Show Bookmark for regular users
+                              return GestureDetector(
+                                onTap: _toggleBookmark,
+                                child: Icon(
+                                  _isBookmarked
+                                      ? Icons.bookmark
+                                      : Icons.bookmark_outline,
+                                  color: _isBookmarked
+                                      ? AppColors.primaryColor
+                                      : Colors.white,
+                                  size: 20.sp,
+                                ),
+                              );
+                            }
+                          },
                         ),
                       ],
                     ),
@@ -101,7 +240,7 @@ class BookDetailScreen extends StatelessWidget {
                               Padding(
                                 padding: EdgeInsets.symmetric(horizontal: 40.w),
                                 child: Text(
-                                  book.title,
+                                  _book.title,
                                   style: AppTextStyles.lufgaLarge.copyWith(
                                     color: Colors.white,
                                     fontSize: 18.sp,
@@ -114,42 +253,43 @@ class BookDetailScreen extends StatelessWidget {
                               8.verticalSpace,
                               // Author
                               Text(
-                                book.author,
+                                _book.author,
                                 style: AppTextStyles.regular.copyWith(
                                   color: Colors.grey[400],
                                   fontSize: 14.sp,
                                 ),
                               ),
                               20.verticalSpace,
-                              // Action Buttons
+                              // Action Buttons - Show based on book type
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  GestureDetector(
-                                    onTap: () {
-                                      AppRouter.routeTo(
-                                        context,
-                                        ReadingScreen(book: book),
-                                      );
-                                    },
-                                    child: _buildActionButton(
-                                      icon: Icons.menu_book,
-                                      text: 'Read Book',
+                                  if (_book.type == BookType.ebook)
+                                    GestureDetector(
+                                      onTap: () {
+                                        AppRouter.routeTo(
+                                          context,
+                                          ReadingScreen(book: _book),
+                                        );
+                                      },
+                                      child: _buildActionButton(
+                                        icon: Icons.menu_book,
+                                        text: 'Read Book',
+                                      ),
                                     ),
-                                  ),
-                                  20.horizontalSpace,
-                                  GestureDetector(
-                                    onTap: () {
-                                      AppRouter.routeTo(
-                                        context,
-                                        ListenScreen(book: book),
-                                      );
-                                    },
-                                    child: _buildActionButton(
-                                      icon: Icons.headphones,
-                                      text: 'Listen Book',
+                                  if (_book.type == BookType.audiobook)
+                                    GestureDetector(
+                                      onTap: () {
+                                        AppRouter.routeTo(
+                                          context,
+                                          ListenScreen(book: _book),
+                                        );
+                                      },
+                                      child: _buildActionButton(
+                                        icon: Icons.headphones,
+                                        text: 'Listen Book',
+                                      ),
                                     ),
-                                  ),
                                 ],
                               ),
 
@@ -160,22 +300,62 @@ class BookDetailScreen extends StatelessWidget {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     // Duration Section
-                                    Row(
-                                      children: [
-                                        Icon(
-                                          Icons.access_time,
-                                          color: AppColors.primaryColor,
-                                          size: 18.sp,
-                                        ),
-                                        5.horizontalSpace,
-                                        Text(
-                                          '${book.readTime} min',
-                                          style: AppTextStyles.medium.copyWith(
-                                            color: AppColors.primaryColor,
-                                            fontSize: 14.sp,
-                                          ),
-                                        ),
-                                      ],
+                                    BlocBuilder<AuthBloc, AuthState>(
+                                      builder: (context, state) {
+                                        final isAdmin =
+                                            state is Authenticated &&
+                                            state.user.role == 'admin';
+                                        return Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Row(
+                                              children: [
+                                                Icon(
+                                                  Icons.access_time,
+                                                  color: AppColors.primaryColor,
+                                                  size: 18.sp,
+                                                ),
+                                                5.horizontalSpace,
+                                                Text(
+                                                  '${_book.readTime} min',
+                                                  style: AppTextStyles.medium
+                                                      .copyWith(
+                                                        color: AppColors
+                                                            .primaryColor,
+                                                        fontSize: 14.sp,
+                                                      ),
+                                                ),
+                                              ],
+                                            ),
+                                            if (isAdmin)
+                                              Row(
+                                                children: [
+                                                  Text(
+                                                    'Published: ',
+                                                    style: AppTextStyles.medium
+                                                        .copyWith(
+                                                          color: Colors.white,
+                                                          fontSize: 14.sp,
+                                                        ),
+                                                  ),
+                                                  8.horizontalSpace,
+                                                  CustomSwitch(
+                                                    value: _book.isPublished,
+                                                    onChanged: _isUpdating
+                                                        ? null
+                                                        : (value) {
+                                                            _handlePublishToggle(
+                                                              value,
+                                                              isAdmin,
+                                                            );
+                                                          },
+                                                  ),
+                                                ],
+                                              ),
+                                          ],
+                                        );
+                                      },
                                     ),
                                     16.verticalSpace,
 
@@ -189,7 +369,7 @@ class BookDetailScreen extends StatelessWidget {
                                     ),
                                     8.verticalSpace,
                                     Text(
-                                      book.description,
+                                      _book.description,
                                       style: AppTextStyles.regular.copyWith(
                                         color: Colors.grey[300],
                                         fontSize: 14.sp,
@@ -345,11 +525,11 @@ class BookDetailScreen extends StatelessWidget {
                         width: 159.w,
                         decoration: BoxDecoration(
                           image: DecorationImage(
-                            image: book.coverImageUrl.startsWith('http')
-                                ? NetworkImage(book.coverImageUrl)
+                            image: _book.coverImageUrl.startsWith('http')
+                                ? NetworkImage(_book.coverImageUrl)
                                       as ImageProvider
-                                : AssetImage(book.coverImageUrl),
-                            fit: BoxFit.cover,
+                                : AssetImage(_book.coverImageUrl),
+                            fit: BoxFit.fill,
                           ),
                           borderRadius: BorderRadius.circular(12.r),
                         ),
@@ -363,6 +543,113 @@ class BookDetailScreen extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  void _handlePublishToggle(bool newValue, bool isAdmin) {
+    if (!isAdmin) return;
+
+    final action = newValue ? 'publish' : 'unpublish';
+    final actionCapitalized = newValue ? 'Publish' : 'Unpublish';
+
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          backgroundColor: AppColors.boxClr,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16.r),
+          ),
+          title: Text(
+            '$actionCapitalized Book',
+            style: AppTextStyles.lufgaLarge.copyWith(
+              color: Colors.white,
+              fontSize: 20.sp,
+            ),
+          ),
+          content: Text(
+            'Are you sure you want to $action "${_book.title}"?',
+            style: AppTextStyles.lufgaMedium.copyWith(
+              color: Colors.white.withOpacity(0.7),
+              fontSize: 14.sp,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: Text(
+                'No',
+                style: TextStyle(color: Colors.grey, fontSize: 14.sp),
+              ),
+            ),
+            TextButton(
+              onPressed: () async {
+                Navigator.pop(dialogContext);
+                await _updatePublishStatus(newValue);
+              },
+              child: Text(
+                'Yes',
+                style: TextStyle(
+                  color: AppColors.primaryColor,
+                  fontSize: 14.sp,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _updatePublishStatus(bool isPublished) async {
+    setState(() {
+      _isUpdating = true;
+    });
+
+    try {
+      final updatedBook = BookModel(
+        id: _book.id,
+        title: _book.title,
+        author: _book.author,
+        description: _book.description,
+        coverImageUrl: _book.coverImageUrl,
+        content: _book.content,
+        pdfUrl: _book.pdfUrl,
+        audioFileUrl: _book.audioFileUrl,
+        chapters: _book.chapters,
+        category: _book.category,
+        type: _book.type,
+        readTime: _book.readTime,
+        listenTime: _book.listenTime,
+        listenCount: _book.listenCount,
+        viewCount: _book.viewCount,
+        readCount: _book.readCount,
+        listenedUserCount: _book.listenedUserCount,
+        isPublished: isPublished,
+        hasEverBeenPublished: _book.hasEverBeenPublished,
+        createdAt: _book.createdAt,
+        updatedAt: DateTime.now(),
+      );
+
+      await BookService.updateBook(_book.id, updatedBook);
+
+      setState(() {
+        _book = updatedBook;
+        _isUpdating = false;
+      });
+
+      CustomToast.showSuccess(
+        context,
+        isPublished
+            ? 'Book published successfully!'
+            : 'Book unpublished successfully!',
+      );
+    } catch (e) {
+      setState(() {
+        _isUpdating = false;
+      });
+      CustomToast.showError(context, 'Error updating book status: $e');
+    }
   }
 
   Widget _buildActionButton({required IconData icon, required String text}) {

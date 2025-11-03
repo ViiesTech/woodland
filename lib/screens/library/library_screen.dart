@@ -130,9 +130,15 @@ class _LibraryScreenState extends State<LibraryScreen> {
             ),
             20.verticalSpace,
 
-            // Tab Content
+            // Tab Content - Use IndexedStack to keep both pages alive and prevent rebuilds
             Expanded(
-              child: selectedTabIndex == 0 ? EbookPage() : AudiobookPage(),
+              child: IndexedStack(
+                index: selectedTabIndex,
+                children: [
+                  EbookPage(),
+                  AudiobookPage(),
+                ],
+              ),
             ),
           ],
         ),

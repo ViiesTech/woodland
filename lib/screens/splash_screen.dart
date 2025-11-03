@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import 'package:the_woodlands_series/components/resource/app_assets.dart';
 import 'package:the_woodlands_series/components/resource/app_routers.dart';
 import 'package:the_woodlands_series/screens/login_screen/login_screen.dart';
 import 'package:the_woodlands_series/screens/dashboard_screen/dashboard_screen.dart';
@@ -81,12 +83,11 @@ class _SplashScreenState extends State<SplashScreen>
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      // App Logo/Icon placeholder
+                      // App Logo
                       Container(
                         width: SizeCons.getResponsiveWidth(120),
                         height: SizeCons.getResponsiveHeight(120),
                         decoration: BoxDecoration(
-                          color: Colors.green,
                           borderRadius: BorderRadius.circular(
                             SizeCons.getResponsiveRadius(20),
                           ),
@@ -105,10 +106,11 @@ class _SplashScreenState extends State<SplashScreen>
                             ),
                           ],
                         ),
-                        child: Icon(
-                          Icons.forest,
-                          size: SizeCons.getResponsiveFontSize(60),
-                          color: Colors.white,
+                        child: Image.asset(
+                          AppAssets.logo,
+                          width: SizeCons.getResponsiveWidth(120),
+                          height: SizeCons.getResponsiveHeight(120),
+                          fit: BoxFit.contain,
                         ),
                       ),
                       SizedBox(height: SizeCons.getResponsiveHeight(30)),

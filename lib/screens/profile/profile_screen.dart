@@ -3,19 +3,26 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:the_woodlands_series/components/button/primary_button.dart';
-import 'package:the_woodlands_series/components/resource/app_assets.dart';
 import 'package:the_woodlands_series/components/resource/app_colors.dart';
 import 'package:the_woodlands_series/components/resource/app_routers.dart';
 import 'package:the_woodlands_series/components/resource/app_textstyle.dart';
 import 'package:the_woodlands_series/components/card/global_card.dart';
 import 'package:the_woodlands_series/components/utils/custom_toast.dart';
-import 'package:the_woodlands_series/screens/library/widgets/continue_listening_widget.dart';
 import 'package:the_woodlands_series/screens/login_screen/login_screen.dart';
 import 'package:the_woodlands_series/bloc/auth/auth_bloc.dart';
 import 'package:the_woodlands_series/bloc/auth/auth_event.dart';
 import 'package:the_woodlands_series/bloc/auth/auth_state.dart';
 import 'package:the_woodlands_series/models/user_model.dart';
 import 'package:the_woodlands_series/screens/profile/edit_profile_screen.dart';
+import 'package:the_woodlands_series/screens/bookmarks/bookmarks_screen.dart';
+import 'package:the_woodlands_series/services/viewed_books_service.dart';
+import 'package:the_woodlands_series/services/global_audio_service.dart';
+import 'package:the_woodlands_series/services/book_service.dart';
+import 'package:the_woodlands_series/services/listening_progress_service.dart';
+import 'package:the_woodlands_series/admin_panel/models/book_model.dart';
+import 'package:the_woodlands_series/screens/reading/listen_screen.dart';
+import 'package:the_woodlands_series/screens/book_detail/book_detail_screen.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class ProfileScreen extends StatefulWidget {
   final String title;
@@ -28,6 +35,11 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   UserModel? currentUser;
+  String? _currentUserId;
+  Map<String, Map<String, dynamic>> _viewedBooksProgress = {};
+  List<BookModel> _allViewedBooks = []; // All viewed books (both types)
+  BookModel? _latestListeningBook; // Latest book with listening progress
+  Map<String, dynamic>? _latestListeningProgress; // Latest listening progress
 
   @override
   void initState() {
@@ -40,54 +52,112 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (authState is Authenticated) {
       setState(() {
         currentUser = authState.user;
+        _currentUserId = authState.user.id;
       });
+      _loadViewedBooks();
+      _loadLatestListeningProgress(); // Load saved listening progress
     }
   }
 
-  final List<Map<String, String>> trendingBooks = [
-    {
-      'title': 'A PIRATE SCENT OF A LADY ORCHARD 2',
-      'author': 'Mark McAllister',
-      'imageAsset': AppAssets.tempGame4,
-      'listenTime': '5m',
-      'readTime': '8m',
-    },
-    {
-      'title': 'THE ENCHANTED FOREST ADVENTURE',
-      'author': 'Sarah Johnson',
-      'imageAsset': AppAssets.tempGame5,
-      'listenTime': '7m',
-      'readTime': '12m',
-    },
-    {
-      'title': 'MYSTERY OF THE DARK WOODS',
-      'author': 'David Wilson',
-      'imageAsset': AppAssets.tempGame6,
-      'listenTime': '4m',
-      'readTime': '6m',
-    },
-    {
-      'title': 'THE LOST TREASURE HUNT',
-      'author': 'Emily Brown',
-      'imageAsset': AppAssets.tempGame4,
-      'listenTime': '9m',
-      'readTime': '15m',
-    },
-    {
-      'title': 'FANTASY REALM CHRONICLES',
-      'author': 'Michael Davis',
-      'imageAsset': AppAssets.tempGame5,
-      'listenTime': '6m',
-      'readTime': '10m',
-    },
-    {
-      'title': 'ADVENTURE IN THE MOUNTAINS',
-      'author': 'Lisa Anderson',
-      'imageAsset': AppAssets.tempGame6,
-      'listenTime': '8m',
-      'readTime': '14m',
-    },
-  ];
+  void _loadViewedBooks() {
+    if (_currentUserId == null) return;
+
+    ViewedBooksService.getAllViewedBooks(_currentUserId!).listen((viewed) {
+      if (mounted) {
+        setState(() {
+          _viewedBooksProgress = viewed;
+        });
+        _loadAllViewedBooks();
+      }
+    });
+  }
+
+  Future<void> _loadAllViewedBooks() async {
+    if (_viewedBooksProgress.isEmpty || _currentUserId == null) {
+      if (mounted) {
+        setState(() {
+          _allViewedBooks = [];
+        });
+      }
+      return;
+    }
+
+    try {
+      // Already sorted by lastViewed in the stream query
+      List<BookModel> books = [];
+      for (var entry in _viewedBooksProgress.entries.take(6)) {
+        try {
+          final book = await BookService.getBookById(entry.key);
+          // Only show published books, or skip if book not found
+          if (book != null && book.isPublished) {
+            books.add(book);
+          }
+        } catch (e) {
+          print('Error loading viewed book ${entry.key}: $e');
+          // Skip books that are not found or have errors
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _allViewedBooks = books;
+        });
+      }
+    } catch (e) {
+      print('Error loading all viewed books: $e');
+    }
+  }
+
+  void _loadLatestListeningProgress() {
+    if (_currentUserId == null) return;
+
+    // Listen to all listening progress for this user
+    ListeningProgressService.getAllProgress(_currentUserId!).listen((
+      progressMap,
+    ) {
+      if (progressMap.isEmpty || _currentUserId == null) {
+        if (mounted) {
+          setState(() {
+            _latestListeningBook = null;
+            _latestListeningProgress = null;
+          });
+        }
+        return;
+      }
+
+      // Get the most recently updated progress
+      MapEntry<String, Map<String, dynamic>>? latestEntry;
+      Timestamp? latestTime;
+
+      for (var entry in progressMap.entries) {
+        final lastUpdated = entry.value['lastUpdated'] as Timestamp?;
+        if (lastUpdated != null) {
+          if (latestTime == null || lastUpdated.compareTo(latestTime) > 0) {
+            latestTime = lastUpdated;
+            latestEntry = entry;
+          }
+        }
+      }
+
+      if (latestEntry != null && mounted) {
+        // Store in local variable for null safety
+        final entry = latestEntry;
+        // Load book details
+        BookService.getBookById(entry.key)
+            .then((book) {
+              if (book != null && mounted) {
+                setState(() {
+                  _latestListeningBook = book;
+                  _latestListeningProgress = entry.value;
+                });
+              }
+            })
+            .catchError((e) {
+              print('Error loading latest listening book: $e');
+            });
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -124,7 +194,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           centerTitle: true,
           title: Text(
-            'Game Detail',
+            'Profile',
             style: AppTextStyles.lufgaLarge.copyWith(
               color: Colors.white,
               fontSize: 20.sp,
@@ -212,34 +282,103 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     children: [
                       40.verticalSpace,
 
-                      // Chapter 2
-                      Text(
-                        'Continue Listening',
-                        style: AppTextStyles.lufgaLarge.copyWith(
-                          color: Colors.white,
-                          fontSize: 18.sp,
-                        ),
-                      ),
-                      16.verticalSpace,
-                      ContinueListeningWIdget(),
-                      16.verticalSpace,
-
-                      // Similar Games
-                      Column(
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      // Bookmarks Section
+                      GestureDetector(
+                        onTap: () {
+                          AppRouter.routeTo(context, const BookmarksScreen());
+                        },
+                        child: Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 16.w,
+                            vertical: 16.h,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.boxClr,
+                            borderRadius: BorderRadius.circular(12.r),
+                          ),
+                          child: Row(
                             children: [
+                              Icon(
+                                Icons.bookmark,
+                                color: AppColors.primaryColor,
+                                size: 24.sp,
+                              ),
+                              16.horizontalSpace,
                               Text(
-                                'Similar Games',
+                                'My Bookmarks',
                                 style: AppTextStyles.lufgaLarge.copyWith(
                                   color: Colors.white,
-                                  fontSize: 20.sp,
+                                  fontSize: 16.sp,
                                 ),
+                              ),
+                              Spacer(),
+                              Icon(
+                                Icons.arrow_forward_ios,
+                                color: Colors.white.withOpacity(0.5),
+                                size: 16.sp,
                               ),
                             ],
                           ),
-                          16.verticalSpace,
+                        ),
+                      ),
+                      16.verticalSpace,
+
+                      // Currently Playing (if any) - Show even if paused/stopped or app restarted
+                      ListenableBuilder(
+                        listenable: GlobalAudioService(),
+                        builder: (context, _) {
+                          final audioService = GlobalAudioService();
+                          // Show if there's a current book in service, OR if there's saved progress
+                          final bookToShow =
+                              audioService.currentBook ?? _latestListeningBook;
+
+                          if (bookToShow != null) {
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Currently Playing',
+                                  style: AppTextStyles.lufgaLarge.copyWith(
+                                    color: Colors.white,
+                                    fontSize: 18.sp,
+                                  ),
+                                ),
+                                16.verticalSpace,
+                                audioService.currentBook != null
+                                    ? _buildCurrentlyPlayingWidget(audioService)
+                                    : _buildContinueListeningWidget(bookToShow),
+                                26.verticalSpace,
+                              ],
+                            );
+                          }
+                          return SizedBox.shrink();
+                        },
+                      ),
+
+                      // Viewed Books (all types - from book detail visits)
+                      if (_viewedBooksProgress.isNotEmpty) ...[
+                        Text(
+                          'Viewed Books',
+                          style: AppTextStyles.lufgaLarge.copyWith(
+                            color: Colors.white,
+                            fontSize: 18.sp,
+                          ),
+                        ),
+                        16.verticalSpace,
+                        if (_allViewedBooks.isEmpty)
+                          Padding(
+                            padding: EdgeInsets.symmetric(vertical: 20.h),
+                            child: Center(
+                              child: Text(
+                                'No viewed books yet',
+                                style: AppTextStyles.regular.copyWith(
+                                  color: Colors.white.withOpacity(0.6),
+                                  fontSize: 14.sp,
+                                ),
+                              ),
+                            ),
+                          )
+                        else
                           GridView.builder(
                             shrinkWrap: true,
                             physics: NeverScrollableScrollPhysics(),
@@ -249,22 +388,31 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   crossAxisCount: 3,
                                   crossAxisSpacing: 16.w,
                                   mainAxisSpacing: 16.h,
-                                  childAspectRatio: 0.43,
+                                  childAspectRatio: 0.52,
                                 ),
-                            itemCount: trendingBooks.length,
+                            itemCount: _allViewedBooks.length,
                             itemBuilder: (context, index) {
-                              final book = trendingBooks[index];
-                              return GlobalCard(
-                                title: book['title']!,
-                                author: book['author']!,
-                                imageAsset: book['imageAsset']!,
-                                listenTime: book['listenTime']!,
-                                readTime: book['readTime']!,
+                              final book = _allViewedBooks[index];
+                              return GestureDetector(
+                                onTap: () {
+                                  AppRouter.routeTo(
+                                    context,
+                                    BookDetailScreen(book: book),
+                                  );
+                                },
+                                child: GlobalCard(
+                                  title: book.title,
+                                  author: book.author,
+                                  imageAsset: book.coverImageUrl,
+                                  listenTime: '${book.listenTime}m',
+                                  readTime: '${book.readTime}m',
+                                  book: book,
+                                ),
                               );
                             },
                           ),
-                        ],
-                      ),
+                        26.verticalSpace,
+                      ],
 
                       40.verticalSpace,
                     ],
@@ -516,5 +664,309 @@ class _ProfileScreenState extends State<ProfileScreen> {
       // Reload user data
       _loadUserData();
     }
+  }
+
+  Widget _buildCurrentlyPlayingWidget(GlobalAudioService audioService) {
+    final book = audioService.currentBook!;
+    final position = audioService.position;
+    final duration = audioService.duration;
+    final progress = duration.inMilliseconds > 0
+        ? position.inMilliseconds / duration.inMilliseconds
+        : 0.0;
+    final chapters = book.chapters ?? [];
+    final currentChapter = audioService.currentChapterIndex < chapters.length
+        ? chapters[audioService.currentChapterIndex]
+        : null;
+
+    return GestureDetector(
+      onTap: () {
+        AppRouter.routeTo(context, ListenScreen(book: book));
+      },
+      child: Container(
+        height: 114.h,
+        decoration: BoxDecoration(
+          color: AppColors.boxClr,
+          borderRadius: BorderRadius.circular(12.r),
+        ),
+        child: Padding(
+          padding: EdgeInsets.all(10.r),
+          child: Row(
+            children: [
+              Container(
+                width: 105.w,
+                height: 105.h,
+                decoration: BoxDecoration(
+                  image: DecorationImage(
+                    image: book.coverImageUrl.startsWith('http')
+                        ? NetworkImage(book.coverImageUrl) as ImageProvider
+                        : AssetImage(book.coverImageUrl),
+                    fit: BoxFit.cover,
+                  ),
+                  borderRadius: BorderRadius.circular(12.r),
+                ),
+              ),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  currentChapter?['chapterName'] ??
+                                      'Chapter ${audioService.currentChapterIndex + 1}',
+                                  style: AppTextStyles.medium.copyWith(
+                                    color: AppColors.primaryColor,
+                                    fontSize: 12.sp,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                Text(
+                                  book.title,
+                                  style: AppTextStyles.lufgaLarge.copyWith(
+                                    color: AppColors.whiteColor,
+                                    fontSize: 16.sp,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                Text(
+                                  book.author,
+                                  style: AppTextStyles.medium.copyWith(
+                                    color: AppColors.whiteColor.withValues(
+                                      alpha: 0.5,
+                                    ),
+                                    fontSize: 12.sp,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                          GestureDetector(
+                            onTap: () {
+                              audioService.playPause();
+                            },
+                            child: Container(
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Color(0xff1B252D),
+                              ),
+                              padding: EdgeInsets.all(8.r),
+                              child: Icon(
+                                audioService.isPlaying
+                                    ? Icons.pause
+                                    : Icons.play_arrow,
+                                color: AppColors.primaryColor,
+                                size: 24.sp,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          RichText(
+                            text: TextSpan(
+                              children: [
+                                TextSpan(
+                                  text: '${_formatDuration(position)}/',
+                                  style: AppTextStyles.medium.copyWith(
+                                    color: AppColors.whiteColor,
+                                    fontSize: 12.sp,
+                                  ),
+                                ),
+                                TextSpan(
+                                  text: ' ${_formatDuration(duration)}',
+                                  style: AppTextStyles.medium.copyWith(
+                                    color: AppColors.whiteColor.withValues(
+                                      alpha: 0.5,
+                                    ),
+                                    fontSize: 12.sp,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          4.verticalSpace,
+                          Stack(
+                            children: [
+                              Container(
+                                width: double.infinity,
+                                height: 4.h,
+                                decoration: BoxDecoration(
+                                  color: Color(0xff677078),
+                                  borderRadius: BorderRadius.circular(50.r),
+                                ),
+                              ),
+                              FractionallySizedBox(
+                                widthFactor: progress.clamp(0.0, 1.0),
+                                child: Container(
+                                  height: 4.h,
+                                  decoration: BoxDecoration(
+                                    color: AppColors.primaryColor,
+                                    borderRadius: BorderRadius.circular(50.r),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _formatDuration(Duration duration) {
+    final minutes = duration.inMinutes;
+    final seconds = duration.inSeconds % 60;
+    return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+  }
+
+  Widget _buildContinueListeningWidget(BookModel book) {
+    final progress = _latestListeningProgress;
+    final chapters = book.chapters ?? [];
+    final chapterIndex = progress?['chapterIndex'] as int? ?? 0;
+
+    final currentChapter = chapterIndex < chapters.length
+        ? chapters[chapterIndex]
+        : null;
+
+    return GestureDetector(
+      onTap: () {
+        AppRouter.routeTo(context, ListenScreen(book: book));
+      },
+      child: Container(
+        height: 114.h,
+        decoration: BoxDecoration(
+          color: AppColors.boxClr,
+          borderRadius: BorderRadius.circular(12.r),
+        ),
+        child: Padding(
+          padding: EdgeInsets.all(10.r),
+          child: Row(
+            children: [
+              Container(
+                width: 105.w,
+                height: 105.h,
+                decoration: BoxDecoration(
+                  image: DecorationImage(
+                    image: book.coverImageUrl.startsWith('http')
+                        ? NetworkImage(book.coverImageUrl) as ImageProvider
+                        : AssetImage(book.coverImageUrl),
+                    fit: BoxFit.cover,
+                  ),
+                  borderRadius: BorderRadius.circular(12.r),
+                ),
+              ),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  currentChapter?['chapterName'] ??
+                                      'Chapter ${chapterIndex + 1}',
+                                  style: AppTextStyles.medium.copyWith(
+                                    color: AppColors.primaryColor,
+                                    fontSize: 12.sp,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                Text(
+                                  book.title,
+                                  style: AppTextStyles.lufgaLarge.copyWith(
+                                    color: AppColors.whiteColor,
+                                    fontSize: 16.sp,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                Text(
+                                  book.author,
+                                  style: AppTextStyles.medium.copyWith(
+                                    color: AppColors.whiteColor.withValues(
+                                      alpha: 0.5,
+                                    ),
+                                    fontSize: 12.sp,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                          GestureDetector(
+                            onTap: () {
+                              AppRouter.routeTo(
+                                context,
+                                ListenScreen(book: book),
+                              );
+                            },
+                            child: Container(
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Color(0xff1B252D),
+                              ),
+                              padding: EdgeInsets.all(8.r),
+                              child: Icon(
+                                Icons.play_arrow,
+                                color: AppColors.primaryColor,
+                                size: 24.sp,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Tap to continue',
+                            style: AppTextStyles.medium.copyWith(
+                              color: AppColors.whiteColor.withValues(
+                                alpha: 0.7,
+                              ),
+                              fontSize: 11.sp,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }

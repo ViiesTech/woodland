@@ -14,7 +14,10 @@ class CloudinaryService {
   /// Upload image to Cloudinary
   /// Returns the secure URL and delete token of the uploaded image
   /// [folder] - Optional folder path in Cloudinary (defaults to CloudinaryConfig.uploadFolder)
-  static Future<CloudinaryUploadResult?> uploadImage(File imageFile, {String? folder}) async {
+  static Future<CloudinaryUploadResult?> uploadImage(
+    File imageFile, {
+    String? folder,
+  }) async {
     print('═══════════════════════════════════════════════════');
     print('🚀 STARTING CLOUDINARY UPLOAD');
     print('═══════════════════════════════════════════════════');
@@ -24,7 +27,7 @@ class CloudinaryService {
       print('📊 File size: ${await imageFile.length()} bytes');
       print('☁️  Cloud name: ${CloudinaryConfig.cloudName}');
       print('🔧 Upload preset: ${CloudinaryConfig.uploadPreset}');
-      
+
       final uploadFolder = folder ?? CloudinaryConfig.uploadFolder;
       print('📂 Folder: $uploadFolder');
 
@@ -143,7 +146,10 @@ class CloudinaryService {
 
   /// Upload PDF or any raw file to Cloudinary
   /// Returns the secure URL and delete token of the uploaded file
-  static Future<CloudinaryUploadResult?> uploadFile(File file, {String? folder}) async {
+  static Future<CloudinaryUploadResult?> uploadFile(
+    File file, {
+    String? folder,
+  }) async {
     print('═══════════════════════════════════════════════════');
     print('🚀 STARTING CLOUDINARY FILE UPLOAD');
     print('═══════════════════════════════════════════════════');
@@ -151,13 +157,15 @@ class CloudinaryService {
     try {
       print('📁 File path: ${file.path}');
       print('📊 File size: ${await file.length()} bytes');
-      
+
       // Determine resource type based on file extension
       final fileName = file.path.toLowerCase();
       String resourceType = 'raw';
       if (fileName.endsWith('.pdf')) {
         resourceType = 'raw'; // PDFs go to raw upload
-      } else if (fileName.endsWith('.mp3') || fileName.endsWith('.m4a') || fileName.endsWith('.wav')) {
+      } else if (fileName.endsWith('.mp3') ||
+          fileName.endsWith('.m4a') ||
+          fileName.endsWith('.wav')) {
         resourceType = 'video'; // Audio files in Cloudinary use video endpoint
       }
 
@@ -182,9 +190,7 @@ class CloudinaryService {
       print('📝 Request fields: ${request.fields}');
 
       // Add the file
-      request.files.add(
-        await http.MultipartFile.fromPath('file', file.path),
-      );
+      request.files.add(await http.MultipartFile.fromPath('file', file.path));
       print('✅ Added file to request');
 
       // Send the request

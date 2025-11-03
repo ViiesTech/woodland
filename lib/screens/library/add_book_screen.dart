@@ -27,8 +27,6 @@ class _AddBookScreenState extends State<AddBookScreen> {
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _authorController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
-  final TextEditingController _readTimeController = TextEditingController();
-  final TextEditingController _listenTimeController = TextEditingController();
   final TextEditingController _categoryController = TextEditingController();
 
   BookType _selectedType = BookType.ebook;
@@ -36,7 +34,10 @@ class _AddBookScreenState extends State<AddBookScreen> {
   File? _pdfFile;
   String? _coverImageUrl;
   String? _pdfUrl; // Will be set after upload
-  String? _audioUrl;
+
+  // Chapters for audiobook: List of {chapterName: String, audioFile: File?, audioUrl: String?}
+  List<Map<String, dynamic>> _chapters = [];
+
   bool _isPublished = true;
   bool _isLoading = false;
 
@@ -56,6 +57,15 @@ class _AddBookScreenState extends State<AddBookScreen> {
     _selectedType = widget.initialType == 'ebook'
         ? BookType.ebook
         : BookType.audiobook;
+
+    // Initialize with one chapter if audiobook
+    if (_selectedType == BookType.audiobook) {
+      _chapters.add({
+        'controller': TextEditingController(text: 'Chapter 1'),
+        'audioFile': null,
+        'audioUrl': null,
+      });
+    }
   }
 
   @override
@@ -63,9 +73,13 @@ class _AddBookScreenState extends State<AddBookScreen> {
     _titleController.dispose();
     _authorController.dispose();
     _descriptionController.dispose();
-    _readTimeController.dispose();
-    _listenTimeController.dispose();
     _categoryController.dispose();
+    // Dispose chapter controllers
+    for (var chapter in _chapters) {
+      if (chapter['controller'] != null) {
+        (chapter['controller'] as TextEditingController).dispose();
+      }
+    }
     super.dispose();
   }
 
@@ -112,6 +126,60 @@ class _AddBookScreenState extends State<AddBookScreen> {
     }
   }
 
+  Future<void> _pickAudioFile(int chapterIndex) async {
+    try {
+      FilePickerResult? result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['mp3', 'wav', 'm4a', 'aac'],
+        allowMultiple: false,
+      );
+
+      if (result != null && result.files.isNotEmpty) {
+        final file = result.files.first;
+        if (file.path != null) {
+          setState(() {
+            _chapters[chapterIndex]['audioFile'] = File(file.path!);
+            _chapters[chapterIndex]['audioUrl'] =
+                null; // Clear URL if file is selected
+          });
+          if (mounted) {
+            CustomToast.showSuccess(context, 'Audio file selected');
+          }
+        } else {
+          if (mounted) {
+            CustomToast.showError(context, 'Could not access audio file path');
+          }
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        CustomToast.showError(context, 'Error selecting audio file: $e');
+      }
+      print('Error in _pickAudioFile: $e');
+    }
+  }
+
+  void _addChapter() {
+    setState(() {
+      _chapters.add({
+        'controller': TextEditingController(
+          text: 'Chapter ${_chapters.length + 1}',
+        ),
+        'audioFile': null,
+        'audioUrl': null,
+      });
+    });
+  }
+
+  void _removeChapter(int index) {
+    setState(() {
+      if (_chapters[index]['controller'] != null) {
+        (_chapters[index]['controller'] as TextEditingController).dispose();
+      }
+      _chapters.removeAt(index);
+    });
+  }
+
   Future<void> _uploadCoverImage() async {
     if (_coverImageFile == null) return;
 
@@ -153,10 +221,36 @@ class _AddBookScreenState extends State<AddBookScreen> {
       return;
     }
 
-    // If audiobook and no audio provided
-    if (_selectedType == BookType.audiobook && _audioUrl == null) {
-      CustomToast.showError(context, 'Please provide audio URL for audiobook');
-      return;
+    // If audiobook and no chapters provided
+    if (_selectedType == BookType.audiobook) {
+      if (_chapters.isEmpty) {
+        CustomToast.showError(
+          context,
+          'Please add at least one chapter for audiobook',
+        );
+        return;
+      }
+      // Check if all chapters have audio files
+      for (var i = 0; i < _chapters.length; i++) {
+        final chapter = _chapters[i];
+        final chapterName = (chapter['controller'] as TextEditingController)
+            .text
+            .trim();
+        if (chapterName.isEmpty) {
+          CustomToast.showError(
+            context,
+            'Chapter ${i + 1} name cannot be empty',
+          );
+          return;
+        }
+        if (chapter['audioFile'] == null && chapter['audioUrl'] == null) {
+          CustomToast.showError(
+            context,
+            'Please select audio file for ${chapterName.isEmpty ? "Chapter ${i + 1}" : chapterName}',
+          );
+          return;
+        }
+      }
     }
 
     setState(() {
@@ -203,6 +297,49 @@ class _AddBookScreenState extends State<AddBookScreen> {
         CustomToast.showSuccess(context, 'PDF uploaded!');
       }
 
+      // Upload audio files for audiobook chapters
+      List<Map<String, String>>? chaptersData;
+      if (_selectedType == BookType.audiobook) {
+        chaptersData = [];
+        for (var i = 0; i < _chapters.length; i++) {
+          final chapter = _chapters[i];
+          final chapterName = (chapter['controller'] as TextEditingController)
+              .text
+              .trim();
+          String? audioUrl = chapter['audioUrl'] as String?;
+
+          // Upload audio file if file is selected
+          if (chapter['audioFile'] != null) {
+            CustomToast.showInfo(
+              context,
+              'Uploading audio for $chapterName...',
+            );
+            final audioResult = await CloudinaryService.uploadFile(
+              chapter['audioFile'] as File,
+              folder: 'book_audios',
+            );
+            if (audioResult == null) {
+              CustomToast.showError(
+                context,
+                'Failed to upload audio for $chapterName',
+              );
+              setState(() {
+                _isLoading = false;
+              });
+              return;
+            }
+            audioUrl = audioResult.url;
+          }
+
+          if (audioUrl != null) {
+            chaptersData.add({
+              'chapterName': chapterName,
+              'audioUrl': audioUrl,
+            });
+          }
+        }
+      }
+
       final book = BookModel(
         id: '', // Will be set by Firestore
         title: _titleController.text.trim(),
@@ -210,13 +347,14 @@ class _AddBookScreenState extends State<AddBookScreen> {
         description: _descriptionController.text.trim(),
         coverImageUrl: finalCoverImageUrl ?? '',
         pdfUrl: finalPdfUrl,
-        audioFileUrl: _audioUrl,
+        audioFileUrl: null, // Keep null, use chapters instead
+        chapters: chaptersData,
         category: _categoryController.text.trim().isEmpty
             ? _categories[0]
             : _categoryController.text.trim(),
         type: _selectedType,
-        readTime: int.tryParse(_readTimeController.text) ?? 0,
-        listenTime: int.tryParse(_listenTimeController.text) ?? 0,
+        readTime: 0, // No longer used
+        listenTime: 0, // No longer used
         isPublished: _isPublished,
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
@@ -275,6 +413,14 @@ class _AddBookScreenState extends State<AddBookScreen> {
                       onTap: () {
                         setState(() {
                           _selectedType = BookType.ebook;
+                          // Clear chapters when switching to ebook
+                          for (var chapter in _chapters) {
+                            if (chapter['controller'] != null) {
+                              (chapter['controller'] as TextEditingController)
+                                  .dispose();
+                            }
+                          }
+                          _chapters.clear();
                         });
                       },
                       child: Container(
@@ -309,6 +455,16 @@ class _AddBookScreenState extends State<AddBookScreen> {
                       onTap: () {
                         setState(() {
                           _selectedType = BookType.audiobook;
+                          // Initialize with one chapter if empty
+                          if (_chapters.isEmpty) {
+                            _chapters.add({
+                              'controller': TextEditingController(
+                                text: 'Chapter 1',
+                              ),
+                              'audioFile': null,
+                              'audioUrl': null,
+                            });
+                          }
                         });
                       },
                       child: Container(
@@ -510,46 +666,138 @@ class _AddBookScreenState extends State<AddBookScreen> {
                 16.verticalSpace,
               ],
 
-              // Audio URL (for audiobook)
+              // Chapters (for audiobook)
               if (_selectedType == BookType.audiobook) ...[
-                PrimaryTextField(
-                  controller: TextEditingController(text: _audioUrl ?? ''),
-                  hint: 'Audio File URL *',
-                  onChanged: (value) {
-                    setState(() {
-                      _audioUrl = value;
-                    });
-                  },
-                  validator: (value) =>
-                      _selectedType == BookType.audiobook &&
-                          (value?.isEmpty ?? true)
-                      ? 'Audio URL is required for audiobook'
-                      : null,
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Chapters *',
+                      style: AppTextStyles.lufgaMedium.copyWith(
+                        color: Colors.white,
+                        fontSize: 14.sp,
+                      ),
+                    ),
+                    TextButton.icon(
+                      onPressed: _addChapter,
+                      icon: Icon(
+                        Icons.add,
+                        color: AppColors.primaryColor,
+                        size: 20.sp,
+                      ),
+                      label: Text(
+                        'Add Chapter',
+                        style: AppTextStyles.medium.copyWith(
+                          color: AppColors.primaryColor,
+                          fontSize: 14.sp,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-                16.verticalSpace,
-              ],
+                8.verticalSpace,
+                if (_chapters.isEmpty) ...[
+                  Text(
+                    'No chapters added. Click "Add Chapter" to add one.',
+                    style: AppTextStyles.regular.copyWith(
+                      color: Colors.grey[400],
+                      fontSize: 12.sp,
+                    ),
+                  ),
+                  16.verticalSpace,
+                ] else ...[
+                  ...List.generate(_chapters.length, (index) {
+                    final chapter = _chapters[index];
+                    final controller =
+                        chapter['controller'] as TextEditingController;
+                    final audioFile = chapter['audioFile'] as File?;
+                    final audioUrl = chapter['audioUrl'] as String?;
 
-              // Timing
-              Row(
-                children: [
-                  Expanded(
-                    child: PrimaryTextField(
-                      controller: _readTimeController,
-                      hint: 'Read Time (min)',
-                      keyboard: TextInputType.number,
-                    ),
-                  ),
-                  16.horizontalSpace,
-                  Expanded(
-                    child: PrimaryTextField(
-                      controller: _listenTimeController,
-                      hint: 'Listen Time (min)',
-                      keyboard: TextInputType.number,
-                    ),
-                  ),
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: PrimaryTextField(
+                                controller: controller,
+                                hint: 'Chapter Name *',
+                              ),
+                            ),
+                            if (_chapters.length > 1)
+                              IconButton(
+                                icon: Icon(Icons.delete, color: Colors.red),
+                                onPressed: () => _removeChapter(index),
+                              ),
+                          ],
+                        ),
+                        8.verticalSpace,
+                        GestureDetector(
+                          onTap: () => _pickAudioFile(index),
+                          child: Container(
+                            height: 80.h,
+                            width: double.infinity,
+                            padding: EdgeInsets.all(16.w),
+                            decoration: BoxDecoration(
+                              color: AppColors.boxClr,
+                              borderRadius: BorderRadius.circular(8.r),
+                              border: Border.all(color: Colors.grey[800]!),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.audiotrack,
+                                  color: AppColors.primaryColor,
+                                  size: 32.sp,
+                                ),
+                                16.horizontalSpace,
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Text(
+                                        audioFile != null
+                                            ? audioFile.path.split('/').last
+                                            : audioUrl != null
+                                            ? 'Audio URL set'
+                                            : 'Tap to select audio file',
+                                        style: AppTextStyles.medium.copyWith(
+                                          color: Colors.white,
+                                          fontSize: 14.sp,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      if (audioFile != null)
+                                        Text(
+                                          'Will upload when saving',
+                                          style: AppTextStyles.small.copyWith(
+                                            color: Colors.grey[400],
+                                            fontSize: 10.sp,
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                                if (audioFile != null || audioUrl != null)
+                                  Icon(
+                                    Icons.check_circle,
+                                    color: Colors.green,
+                                    size: 24.sp,
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        if (index < _chapters.length - 1) 16.verticalSpace,
+                      ],
+                    );
+                  }),
+                  16.verticalSpace,
                 ],
-              ),
-              24.verticalSpace,
+              ],
 
               // Published checkbox
               Row(

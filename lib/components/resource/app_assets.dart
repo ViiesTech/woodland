@@ -31,4 +31,5 @@ class AppAssets {
   static const tempGame4 = "assets/tempImg/tempGame4.png";
   static const tempGame5 = "assets/tempImg/tempGame5.png";
   static const tempGame6 = "assets/tempImg/tempGame6.png";
+  static const logo = "assets/tempImg/logo.png";
 }

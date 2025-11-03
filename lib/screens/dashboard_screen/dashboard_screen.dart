@@ -12,6 +12,9 @@ import '../admin_home/admin_home_screen.dart';
 import '../library/library_screen.dart';
 import '../messages/messages_screen.dart';
 import '../games/games_screen.dart';
+import '../../services/global_audio_service.dart';
+import '../reading/listen_screen.dart';
+import '../../components/resource/app_routers.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -22,6 +25,7 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   int _currentIndex = 0;
+  final GlobalAudioService _audioService = GlobalAudioService();
 
   List<Widget> _getScreens(bool isAdmin) {
     if (isAdmin) {
@@ -42,6 +46,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    _audioService.initialize();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return BlocBuilder<AuthBloc, AuthState>(
       builder: (context, state) {
@@ -51,6 +61,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
         return Scaffold(
           backgroundColor: Colors.black,
           body: screens[_currentIndex],
+          floatingActionButton: ListenableBuilder(
+            listenable: _audioService,
+            builder: (context, _) {
+              if (!_audioService.isVisible ||
+                  _audioService.currentBook == null) {
+                return const SizedBox.shrink();
+              }
+
+              return _buildAudioPlayerOverlay();
+            },
+          ),
+          floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
           bottomNavigationBar: Container(
             height: 75.h,
             decoration: BoxDecoration(
@@ -73,7 +95,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
             child: Row(
               children: [
                 Expanded(child: _buildNavItem(0, AppAssets.homeIcon, 'Home')),
-                Expanded(child: _buildNavItem(1, AppAssets.libraryIcon, 'Library')),
+                Expanded(
+                  child: _buildNavItem(1, AppAssets.libraryIcon, 'Library'),
+                ),
                 Expanded(
                   child: _buildNavItem(2, AppAssets.messagesIcon, 'Messages'),
                 ),
@@ -126,6 +150,87 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 color: color,
                 fontSize: SizeCons.getResponsiveFontSize(12),
                 fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAudioPlayerOverlay() {
+    final book = _audioService.currentBook!;
+
+    return GestureDetector(
+      onTap: () {
+        // Navigate to ListenScreen when overlay is tapped
+        AppRouter.routeTo(context, ListenScreen(book: book));
+      },
+      child: Container(
+        margin: EdgeInsets.symmetric(horizontal: 16.w),
+        width: 100.w,
+        height: 100.h,
+        decoration: BoxDecoration(
+          image: DecorationImage(
+            image: book.coverImageUrl.startsWith('http')
+                ? NetworkImage(book.coverImageUrl) as ImageProvider
+                : AssetImage(book.coverImageUrl),
+            fit: BoxFit.cover,
+          ),
+          borderRadius: BorderRadius.circular(12.r),
+          border: Border.all(
+            color: AppColors.primaryColor.withOpacity(0.5),
+            width: 2,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.4),
+              blurRadius: 12.r,
+              offset: Offset(0, 4.h),
+            ),
+          ],
+        ),
+        child: Stack(
+          children: [
+            // Play/Pause Button Overlay (center)
+            Positioned.fill(
+              child: Center(
+                child: GestureDetector(
+                  onTap: () => _audioService.playPause(),
+                  behavior: HitTestBehavior.opaque,
+                  child: Container(
+                    width: 35.w,
+                    height: 35.h,
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryColor.withOpacity(0.9),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      _audioService.isPlaying ? Icons.pause : Icons.play_arrow,
+                      color: Colors.black,
+                      size: 24.sp,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            // Close Button Overlay (top right)
+            Positioned(
+              top: 0.h,
+              right: 0.w,
+              child: GestureDetector(
+                onTap: () {
+                  _audioService.stopAndClear();
+                },
+                child: Container(
+                  width: 20.w,
+                  height: 20.h,
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.7),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(Icons.close, color: Colors.white, size: 16.sp),
+                ),
               ),
             ),
           ],

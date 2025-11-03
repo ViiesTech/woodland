@@ -12,6 +12,12 @@ import 'package:the_woodlands_series/screens/profile/profile_screen.dart';
 import 'package:the_woodlands_series/bloc/auth/auth_bloc.dart';
 import 'package:the_woodlands_series/bloc/auth/auth_state.dart';
 import 'package:the_woodlands_series/models/user_model.dart';
+import 'package:the_woodlands_series/services/book_service.dart';
+import 'package:the_woodlands_series/services/reading_progress_service.dart';
+import 'package:the_woodlands_series/admin_panel/models/book_model.dart';
+import 'package:the_woodlands_series/screens/book_detail/book_detail_screen.dart';
+import 'package:the_woodlands_series/components/utils/three_dot_loader.dart';
+import 'package:the_woodlands_series/components/button/bookmark_icon_button.dart';
 
 import '../../components/resource/app_colors.dart';
 
@@ -45,52 +51,6 @@ class _HomeScreenState extends State<HomeScreen> {
     {'title': 'Trending', 'icon': AppAssets.fireIcon},
     {'title': '5-Minutes Read', 'icon': AppAssets.readIcon},
     {'title': 'Quick Listen', 'icon': AppAssets.headphoneIcon},
-  ];
-
-  // JSON-like data for trending books
-  final List<Map<String, String>> trendingBooks = [
-    {
-      'title': 'A PIRATE SCENT OF A LADY ORCHARD 2',
-      'author': 'Mark McAllister',
-      'imageAsset': AppAssets.temp1,
-      'listenTime': '5m',
-      'readTime': '8m',
-    },
-    {
-      'title': 'THE ENCHANTED FOREST ADVENTURE',
-      'author': 'Sarah Johnson',
-      'imageAsset': AppAssets.temp2,
-      'listenTime': '7m',
-      'readTime': '12m',
-    },
-    {
-      'title': 'MYSTERY OF THE DARK WOODS',
-      'author': 'David Wilson',
-      'imageAsset': AppAssets.temp3,
-      'listenTime': '4m',
-      'readTime': '6m',
-    },
-    {
-      'title': 'THE LOST TREASURE HUNT',
-      'author': 'Emily Brown',
-      'imageAsset': AppAssets.temp4,
-      'listenTime': '9m',
-      'readTime': '15m',
-    },
-    {
-      'title': 'FANTASY REALM CHRONICLES',
-      'author': 'Michael Davis',
-      'imageAsset': AppAssets.temp5,
-      'listenTime': '6m',
-      'readTime': '10m',
-    },
-    {
-      'title': 'ADVENTURE IN THE MOUNTAINS',
-      'author': 'Lisa Anderson',
-      'imageAsset': AppAssets.temp6,
-      'listenTime': '8m',
-      'readTime': '14m',
-    },
   ];
 
   @override
@@ -172,23 +132,47 @@ class _HomeScreenState extends State<HomeScreen> {
                   children: [
                     15.verticalSpace,
 
-                    Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 16.w),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Continue Reading',
-                            style: AppTextStyles.lufgaLarge.copyWith(
-                              color: Colors.white,
-                              fontSize: 20.sp,
-                            ),
+                    // Continue Reading Section - only show heading if there's data
+                    BlocBuilder<AuthBloc, AuthState>(
+                      builder: (context, authState) {
+                        if (authState is! Authenticated) {
+                          return SizedBox.shrink();
+                        }
+
+                        return StreamBuilder<Map<String, Map<String, dynamic>>>(
+                          stream: ReadingProgressService.getAllProgress(
+                            authState.user.id,
                           ),
-                          20.verticalSpace,
-                          ContinueReadingWidget(),
-                          40.verticalSpace,
-                        ],
-                      ),
+                          builder: (context, progressSnapshot) {
+                            final hasProgress =
+                                progressSnapshot.hasData &&
+                                progressSnapshot.data!.isNotEmpty;
+
+                            if (!hasProgress) {
+                              return SizedBox.shrink();
+                            }
+
+                            return Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 16.w),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Continue Reading',
+                                    style: AppTextStyles.lufgaLarge.copyWith(
+                                      color: Colors.white,
+                                      fontSize: 20.sp,
+                                    ),
+                                  ),
+                                  20.verticalSpace,
+                                  ContinueReadingWidget(),
+                                  40.verticalSpace,
+                                ],
+                              ),
+                            );
+                          },
+                        );
+                      },
                     ),
                     SizedBox(
                       height: 45.h,
@@ -245,152 +229,317 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                     40.verticalSpace,
-                    Column(
-                      children: [
-                        Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 16.w),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                'Top Trending',
-                                style: AppTextStyles.lufgaLarge.copyWith(
-                                  color: Colors.white,
-                                  fontSize: 20.sp,
-                                ),
+                    // Top Trending Section
+                    BlocBuilder<AuthBloc, AuthState>(
+                      builder: (context, state) {
+                        final isAdmin =
+                            state is Authenticated &&
+                            state.user.role == 'admin';
+                        final userId = state is Authenticated
+                            ? state.user.id
+                            : null;
+
+                        return Column(
+                          children: [
+                            Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 16.w),
+                              child: Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    'Top Trending',
+                                    style: AppTextStyles.lufgaLarge.copyWith(
+                                      color: Colors.white,
+                                      fontSize: 20.sp,
+                                    ),
+                                  ),
+                                  Text(
+                                    'View all',
+                                    style: AppTextStyles.medium.copyWith(
+                                      color: AppColors.primaryColor,
+                                      fontSize: 12.sp,
+                                    ),
+                                  ),
+                                ],
                               ),
-                              Text(
-                                'View all',
-                                style: AppTextStyles.medium.copyWith(
-                                  color: AppColors.primaryColor,
-                                  fontSize: 12.sp,
-                                ),
+                            ),
+                            16.verticalSpace,
+                            StreamBuilder<List<BookModel>>(
+                              stream: BookService.getTopTrendingBooks(
+                                adminMode: isAdmin,
+                                limit: 10,
                               ),
-                            ],
-                          ),
-                        ),
-                        16.verticalSpace,
-                        SizedBox(
-                          height: 200.h,
-                          child: ListView.builder(
-                            scrollDirection: Axis.horizontal,
-                            itemCount: trendingBooks.length,
-                            padding: EdgeInsets.symmetric(horizontal: 16.w),
-                            itemBuilder: (context, index) {
-                              final book = trendingBooks[index];
-                              return Container(
-                                margin: EdgeInsets.only(right: 16.w),
-                                child: GlobalCard(
-                                  title: book['title']!,
-                                  author: book['author']!,
-                                  imageAsset: book['imageAsset']!,
-                                  listenTime: book['listenTime']!,
-                                  readTime: book['readTime']!,
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                      ],
+                              builder: (context, snapshot) {
+                                if (snapshot.connectionState ==
+                                        ConnectionState.waiting &&
+                                    !snapshot.hasData) {
+                                  return SizedBox(
+                                    height: 200.h,
+                                    child: Center(
+                                      child: ThreeDotLoader(
+                                        color: AppColors.primaryColor,
+                                        size: 12.w,
+                                        spacing: 8.w,
+                                      ),
+                                    ),
+                                  );
+                                }
+
+                                final books = snapshot.data ?? [];
+                                if (books.isEmpty) {
+                                  return SizedBox.shrink();
+                                }
+
+                                return SizedBox(
+                                  height: 200.h,
+                                  child: ListView.builder(
+                                    scrollDirection: Axis.horizontal,
+                                    itemCount: books.length,
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: 16.w,
+                                    ),
+                                    itemBuilder: (context, index) {
+                                      final book = books[index];
+                                      return Container(
+                                        margin: EdgeInsets.only(right: 16.w),
+                                        child: Stack(
+                                          children: [
+                                            GestureDetector(
+                                              onTap: () {
+                                                AppRouter.routeTo(
+                                                  context,
+                                                  BookDetailScreen(book: book),
+                                                );
+                                              },
+                                              child: GlobalCard(
+                                                title: book.title,
+                                                author: book.author,
+                                                imageAsset: book.coverImageUrl,
+                                                listenTime:
+                                                    '${book.listenTime}m',
+                                                readTime: '${book.readTime}m',
+                                                book: book,
+                                              ),
+                                            ),
+                                            if (userId != null)
+                                              Positioned(
+                                                top: 4.h,
+                                                right: 4.w,
+                                                child: BookmarkIconButton(
+                                                  userId: userId,
+                                                  book: book,
+                                                ),
+                                              ),
+                                          ],
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                );
+                              },
+                            ),
+                          ],
+                        );
+                      },
                     ),
                     26.verticalSpace,
-                    Column(
-                      children: [
-                        Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 16.w),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                'New Release',
-                                style: AppTextStyles.lufgaLarge.copyWith(
-                                  color: Colors.white,
-                                  fontSize: 20.sp,
-                                ),
+                    // New Release Section
+                    BlocBuilder<AuthBloc, AuthState>(
+                      builder: (context, state) {
+                        final isAdmin =
+                            state is Authenticated &&
+                            state.user.role == 'admin';
+                        final userId = state is Authenticated
+                            ? state.user.id
+                            : null;
+
+                        return Column(
+                          children: [
+                            Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 16.w),
+                              child: Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    'New Release',
+                                    style: AppTextStyles.lufgaLarge.copyWith(
+                                      color: Colors.white,
+                                      fontSize: 20.sp,
+                                    ),
+                                  ),
+                                  Text(
+                                    'View all',
+                                    style: AppTextStyles.medium.copyWith(
+                                      color: AppColors.primaryColor,
+                                      fontSize: 12.sp,
+                                    ),
+                                  ),
+                                ],
                               ),
-                              Text(
-                                'View all',
-                                style: AppTextStyles.medium.copyWith(
-                                  color: AppColors.primaryColor,
-                                  fontSize: 12.sp,
-                                ),
+                            ),
+                            16.verticalSpace,
+                            StreamBuilder<List<BookModel>>(
+                              stream: BookService.getNewReleases(
+                                adminMode: isAdmin,
+                                limit: 10,
                               ),
-                            ],
-                          ),
-                        ),
-                        16.verticalSpace,
-                        SizedBox(
-                          height: 200.h,
-                          child: ListView.builder(
-                            scrollDirection: Axis.horizontal,
-                            itemCount: trendingBooks.length,
-                            padding: EdgeInsets.symmetric(horizontal: 16.w),
-                            itemBuilder: (context, index) {
-                              final book = trendingBooks[index];
-                              return Container(
-                                margin: EdgeInsets.only(right: 16.w),
-                                child: GlobalCard(
-                                  title: book['title']!,
-                                  author: book['author']!,
-                                  imageAsset: book['imageAsset']!,
-                                  listenTime: book['listenTime']!,
-                                  readTime: book['readTime']!,
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                      ],
+                              builder: (context, snapshot) {
+                                if (snapshot.connectionState ==
+                                        ConnectionState.waiting &&
+                                    !snapshot.hasData) {
+                                  return SizedBox(
+                                    height: 200.h,
+                                    child: Center(
+                                      child: ThreeDotLoader(
+                                        color: AppColors.primaryColor,
+                                        size: 12.w,
+                                        spacing: 8.w,
+                                      ),
+                                    ),
+                                  );
+                                }
+
+                                final books = snapshot.data ?? [];
+                                if (books.isEmpty) {
+                                  return SizedBox.shrink();
+                                }
+
+                                return SizedBox(
+                                  height: 200.h,
+                                  child: ListView.builder(
+                                    scrollDirection: Axis.horizontal,
+                                    itemCount: books.length,
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: 16.w,
+                                    ),
+                                    itemBuilder: (context, index) {
+                                      final book = books[index];
+                                      return Container(
+                                        margin: EdgeInsets.only(right: 16.w),
+                                        child: Stack(
+                                          children: [
+                                            GestureDetector(
+                                              onTap: () {
+                                                AppRouter.routeTo(
+                                                  context,
+                                                  BookDetailScreen(book: book),
+                                                );
+                                              },
+                                              child: GlobalCard(
+                                                title: book.title,
+                                                author: book.author,
+                                                imageAsset: book.coverImageUrl,
+                                                listenTime:
+                                                    '${book.listenTime}m',
+                                                readTime: '${book.readTime}m',
+                                                book: book,
+                                              ),
+                                            ),
+                                            if (userId != null)
+                                              Positioned(
+                                                top: 4.h,
+                                                right: 4.w,
+                                                child: BookmarkIconButton(
+                                                  userId: userId,
+                                                  book: book,
+                                                ),
+                                              ),
+                                          ],
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                );
+                              },
+                            ),
+                          ],
+                        );
+                      },
                     ),
                     26.verticalSpace,
-                    Column(
-                      children: [
-                        Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 16.w),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                'Coming Soon',
-                                style: AppTextStyles.lufgaLarge.copyWith(
-                                  color: Colors.white,
-                                  fontSize: 20.sp,
-                                ),
-                              ),
-                              Text(
-                                'View all',
-                                style: AppTextStyles.medium.copyWith(
-                                  color: AppColors.primaryColor,
-                                  fontSize: 12.sp,
-                                ),
-                              ),
-                            ],
+                    // Coming Soon Section
+                    BlocBuilder<AuthBloc, AuthState>(
+                      builder: (context, state) {
+                        final isAdmin =
+                            state is Authenticated &&
+                            state.user.role == 'admin';
+
+                        return StreamBuilder<List<BookModel>>(
+                          stream: BookService.getComingSoonBooks(
+                            adminMode: isAdmin,
+                            limit: 10,
                           ),
-                        ),
-                        16.verticalSpace,
-                        SizedBox(
-                          height: 200.h,
-                          child: ListView.builder(
-                            scrollDirection: Axis.horizontal,
-                            itemCount: trendingBooks.length,
-                            padding: EdgeInsets.symmetric(horizontal: 16.w),
-                            itemBuilder: (context, index) {
-                              final book = trendingBooks[index];
-                              return Container(
-                                margin: EdgeInsets.only(right: 16.w),
-                                child: GlobalCard(
-                                  title: book['title']!,
-                                  author: book['author']!,
-                                  imageAsset: book['imageAsset']!,
-                                  listenTime: book['listenTime']!,
-                                  readTime: book['readTime']!,
-                                  blur: true, // First card has blur
+                          builder: (context, snapshot) {
+                            if (snapshot.connectionState ==
+                                    ConnectionState.waiting &&
+                                !snapshot.hasData) {
+                              return SizedBox(
+                                height: 200.h,
+                                child: Center(
+                                  child: ThreeDotLoader(
+                                    color: AppColors.primaryColor,
+                                    size: 12.w,
+                                    spacing: 8.w,
+                                  ),
                                 ),
                               );
-                            },
-                          ),
-                        ),
-                      ],
+                            }
+
+                            final books = snapshot.data ?? [];
+                            if (books.isEmpty) {
+                              return SizedBox.shrink();
+                            }
+
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Padding(
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: 16.w,
+                                  ),
+                                  child: Text(
+                                    'Coming Soon',
+                                    style: AppTextStyles.lufgaLarge.copyWith(
+                                      color: Colors.white,
+                                      fontSize: 20.sp,
+                                    ),
+                                  ),
+                                ),
+                                16.verticalSpace,
+                                SizedBox(
+                                  height: 200.h,
+                                  child: ListView.builder(
+                                    scrollDirection: Axis.horizontal,
+                                    itemCount: books.length,
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: 16.w,
+                                    ),
+                                    itemBuilder: (context, index) {
+                                      final book = books[index];
+                                      return Container(
+                                        margin: EdgeInsets.only(right: 16.w),
+                                        child: GlobalCard(
+                                          title: book.title,
+                                          author: book.author,
+                                          imageAsset: book.coverImageUrl,
+                                          listenTime: '${book.listenTime}m',
+                                          readTime: '${book.readTime}m',
+                                          book: book,
+                                          blur: true, // Blur for coming soon
+                                          hideStatistics:
+                                              true, // Hide view/read counts
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
+                        );
+                      },
                     ),
                     26.verticalSpace,
                   ],

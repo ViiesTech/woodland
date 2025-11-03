@@ -1,9 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-enum BookType {
-  ebook,
-  audiobook,
-}
+enum BookType { ebook, audiobook }
 
 class BookModel {
   final String id;
@@ -13,12 +10,24 @@ class BookModel {
   final String coverImageUrl;
   final String? content; // For ebook text content (optional if using PDF)
   final String? pdfUrl; // PDF file URL for ebook reading
-  final String? audioFileUrl; // Audio file URL for audiobook
+  final String?
+  audioFileUrl; // Audio file URL for audiobook (legacy - kept for backward compatibility)
+  final List<Map<String, String>>?
+  chapters; // For audiobook: [{chapterName: String, audioUrl: String}]
   final String category;
   final BookType type; // ebook or audiobook
   final int readTime; // in minutes
   final int listenTime; // in minutes
+  final int
+  listenCount; // Number of times users have listened to this audiobook
+  final int viewCount; // Total number of unique users who viewed this book
+  final int
+  readCount; // Total number of unique users who read this book (ebooks)
+  final int
+  listenedUserCount; // Total number of unique users who listened to this book (audiobooks)
   final bool isPublished;
+  final bool
+  hasEverBeenPublished; // Track if book has ever been published (for "Coming Soon" logic)
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -31,11 +40,17 @@ class BookModel {
     this.content,
     this.pdfUrl,
     this.audioFileUrl,
+    this.chapters,
     required this.category,
     required this.type,
     required this.readTime,
     required this.listenTime,
+    this.listenCount = 0,
+    this.viewCount = 0,
+    this.readCount = 0,
+    this.listenedUserCount = 0,
     required this.isPublished,
+    this.hasEverBeenPublished = false,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -49,11 +64,17 @@ class BookModel {
       'content': content,
       'pdfUrl': pdfUrl,
       'audioFileUrl': audioFileUrl,
+      'chapters': chapters,
       'category': category,
       'type': type == BookType.ebook ? 'ebook' : 'audiobook',
       'readTime': readTime,
       'listenTime': listenTime,
+      'listenCount': listenCount,
+      'viewCount': viewCount,
+      'readCount': readCount,
+      'listenedUserCount': listenedUserCount,
       'isPublished': isPublished,
+      'hasEverBeenPublished': hasEverBeenPublished,
       'createdAt': Timestamp.fromDate(createdAt),
       'updatedAt': Timestamp.fromDate(updatedAt),
     };
@@ -69,13 +90,25 @@ class BookModel {
       content: data['content'] as String?,
       pdfUrl: data['pdfUrl'] as String?,
       audioFileUrl: data['audioFileUrl'] as String?,
+      chapters: data['chapters'] != null
+          ? List<Map<String, String>>.from(
+              (data['chapters'] as List).map(
+                (item) => Map<String, String>.from(item as Map),
+              ),
+            )
+          : null,
       category: data['category'] as String? ?? '',
       type: (data['type'] as String? ?? 'ebook') == 'ebook'
           ? BookType.ebook
           : BookType.audiobook,
       readTime: data['readTime'] as int? ?? 0,
       listenTime: data['listenTime'] as int? ?? 0,
+      listenCount: data['listenCount'] as int? ?? 0,
+      viewCount: data['viewCount'] as int? ?? 0,
+      readCount: data['readCount'] as int? ?? 0,
+      listenedUserCount: data['listenedUserCount'] as int? ?? 0,
       isPublished: data['isPublished'] as bool? ?? false,
+      hasEverBeenPublished: data['hasEverBeenPublished'] as bool? ?? false,
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       updatedAt: (data['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
     );
@@ -92,11 +125,17 @@ class BookModel {
       'content': content,
       'pdfUrl': pdfUrl,
       'audioFileUrl': audioFileUrl,
+      'chapters': chapters,
       'category': category,
       'type': type == BookType.ebook ? 'ebook' : 'audiobook',
       'readTime': readTime,
       'listenTime': listenTime,
+      'listenCount': listenCount,
+      'viewCount': viewCount,
+      'readCount': readCount,
+      'listenedUserCount': listenedUserCount,
       'isPublished': isPublished,
+      'hasEverBeenPublished': hasEverBeenPublished,
       'createdAt': createdAt.millisecondsSinceEpoch,
       'updatedAt': updatedAt.millisecondsSinceEpoch,
     };
@@ -112,13 +151,25 @@ class BookModel {
       content: map['content'],
       pdfUrl: map['pdfUrl'],
       audioFileUrl: map['audioFileUrl'],
+      chapters: map['chapters'] != null
+          ? List<Map<String, String>>.from(
+              (map['chapters'] as List).map(
+                (item) => Map<String, String>.from(item as Map),
+              ),
+            )
+          : null,
       category: map['category'] ?? '',
       type: (map['type'] ?? 'ebook') == 'ebook'
           ? BookType.ebook
           : BookType.audiobook,
       readTime: map['readTime'] ?? 0,
       listenTime: map['listenTime'] ?? 0,
+      listenCount: map['listenCount'] ?? 0,
+      viewCount: map['viewCount'] ?? 0,
+      readCount: map['readCount'] ?? 0,
+      listenedUserCount: map['listenedUserCount'] ?? 0,
       isPublished: map['isPublished'] ?? false,
+      hasEverBeenPublished: map['hasEverBeenPublished'] ?? false,
       createdAt: DateTime.fromMillisecondsSinceEpoch(map['createdAt'] ?? 0),
       updatedAt: DateTime.fromMillisecondsSinceEpoch(map['updatedAt'] ?? 0),
     );
