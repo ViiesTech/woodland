@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:flutter_svg/svg.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:the_woodlands_series/Components/resource/app_routers.dart';
 import 'package:the_woodlands_series/components/card/global_card.dart';
@@ -31,7 +30,8 @@ class _GamesScreenState extends State<GamesScreen> {
     initialPage: 1000, // Start from middle for infinite scroll
     viewportFraction: 0.6, // Show more of side cards
   );
-  int selectedCategoryIndex = 0;
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
 
   int _currentIndex = 0;
   bool isAdmin = false;
@@ -79,6 +79,7 @@ class _GamesScreenState extends State<GamesScreen> {
   void dispose() {
     _gamesSubscription?.cancel();
     _pageController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -91,11 +92,6 @@ class _GamesScreenState extends State<GamesScreen> {
     }
   }
 
-  final List<Map<String, String>> categories = [
-    {'title': 'Trending', 'icon': AppAssets.fireIcon},
-    {'title': 'Quick Games', 'icon': AppAssets.readIcon},
-    {'title': 'Simulation', 'icon': AppAssets.headphoneIcon},
-  ];
 
   @override
   Widget build(BuildContext context) {
@@ -174,16 +170,16 @@ class _GamesScreenState extends State<GamesScreen> {
 
                     // Search Bar
                     PrimaryTextField(
-                      hint: 'Search Chat',
-                      prefixIcon: Icon(
-                        Icons.search,
-                        size: 20.sp,
-                        color: Colors.grey[600],
-                      ),
-
-                      height: 50.h,
+                      controller: _searchController,
+                      hint: 'Title, author or keyword',
+                      prefixIcon: Icon(Icons.search, size: 20.sp),
+                      height: 55.h,
                       verticalPad: 10.h,
-                      fillColor: AppColors.boxClr,
+                      onChanged: (value) {
+                        setState(() {
+                          _searchQuery = value;
+                        });
+                      },
                     ),
 
                     20.verticalSpace,
@@ -191,256 +187,292 @@ class _GamesScreenState extends State<GamesScreen> {
                 ),
               ),
 
-              // Category Filters
-              SizedBox(
-                height: 45.h,
-                child: ListView.builder(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: categories.length,
-                  padding: EdgeInsets.symmetric(horizontal: 16.w),
-                  itemBuilder: (context, index) {
-                    final isSelected = selectedCategoryIndex == index;
-                    return GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          selectedCategoryIndex = index;
-                        });
-                      },
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: isSelected
-                              ? AppColors.boxClr
-                              : Colors.transparent,
-                          borderRadius: BorderRadius.circular(10.r),
-                        ),
-                        padding: EdgeInsets.symmetric(
-                          horizontal: 16.w,
-                          vertical: 10.h,
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            SvgPicture.asset(
-                              categories[index]['icon']!,
-                              height: 18.h,
-                              colorFilter: ColorFilter.mode(
-                                isSelected ? Colors.white : Colors.white,
-                                BlendMode.srcIn,
-                              ),
-                            ),
-                            5.horizontalSpace,
-                            Text(
-                              categories[index]['title']!,
-                              style: AppTextStyles.medium.copyWith(
-                                color: isSelected ? Colors.white : Colors.white,
-                                fontSize: 14.sp,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-
-              30.verticalSpace,
-
-              // Featured Games Carousel
-              _isLoadingGames
-                  ? SizedBox(
-                      height: 350.h,
-                      child: Center(
-                        child: ThreeDotLoader(
-                          color: AppColors.primaryColor,
-                          size: 12.w,
-                          spacing: 8.w,
-                        ),
-                      ),
-                    )
-                  : featuredGames.isEmpty
-                  ? SizedBox(
-                      height: 350.h,
-                      child: Center(
-                        child: Text(
-                          'No games available',
-                          style: AppTextStyles.medium.copyWith(
-                            color: Colors.white.withOpacity(0.7),
-                            fontSize: 14.sp,
+              // Content based on search query
+              if (_searchQuery.isEmpty) ...[
+                // Featured Games Carousel
+                _isLoadingGames
+                    ? SizedBox(
+                        height: 350.h,
+                        child: Center(
+                          child: ThreeDotLoader(
+                            color: AppColors.primaryColor,
+                            size: 12.w,
+                            spacing: 8.w,
                           ),
                         ),
-                      ),
-                    )
-                  : SizedBox(
-                      height: 350.h,
-                      child: PageView.builder(
-                        controller: _pageController,
-                        itemCount:
-                            featuredGames.length * 2000, // For infinite scroll
-                        onPageChanged: (index) {
-                          setState(() {
-                            _currentIndex = index % featuredGames.length;
-                          });
-                        },
-                        itemBuilder: (context, index) {
-                          final gameIndex = index % featuredGames.length;
-                          final game = featuredGames[gameIndex];
+                      )
+                    : featuredGames.isEmpty
+                    ? SizedBox(
+                        height: 350.h,
+                        child: Center(
+                          child: Text(
+                            'No games available',
+                            style: AppTextStyles.medium.copyWith(
+                              color: Colors.white.withOpacity(0.7),
+                              fontSize: 14.sp,
+                            ),
+                          ),
+                        ),
+                      )
+                    : SizedBox(
+                        height: 350.h,
+                        child: PageView.builder(
+                          controller: _pageController,
+                          itemCount:
+                              featuredGames.length * 2000, // For infinite scroll
+                          onPageChanged: (index) {
+                            setState(() {
+                              _currentIndex = index % featuredGames.length;
+                            });
+                          },
+                          itemBuilder: (context, index) {
+                            final gameIndex = index % featuredGames.length;
+                            final game = featuredGames[gameIndex];
 
-                          return GestureDetector(
-                            onTap: () {
-                              AppRouter.routeTo(
-                                context,
-                                GameDetailScreen(game: game),
-                              );
-                            },
-                            child: AnimatedBuilder(
-                              animation: _pageController,
-                              builder: (context, child) {
-                                double value = 0.0;
-                                if (_pageController.position.haveDimensions) {
-                                  value =
-                                      index.toDouble() -
-                                      (_pageController.page ?? 0);
-                                  value = (1 - (value.abs() * 0.3)).clamp(
-                                    0.0,
-                                    1.0,
-                                  );
-                                } else {
-                                  // If we don't have dimensions yet, use a default value
-                                  value = index == 1000 ? 1.0 : 0.7;
-                                }
+                            return GestureDetector(
+                              onTap: () {
+                                AppRouter.routeTo(
+                                  context,
+                                  GameDetailScreen(game: game),
+                                );
+                              },
+                              child: AnimatedBuilder(
+                                animation: _pageController,
+                                builder: (context, child) {
+                                  double value = 0.0;
+                                  if (_pageController.position.haveDimensions) {
+                                    value =
+                                        index.toDouble() -
+                                        (_pageController.page ?? 0);
+                                    value = (1 - (value.abs() * 0.3)).clamp(
+                                      0.0,
+                                      1.0,
+                                    );
+                                  } else {
+                                    // If we don't have dimensions yet, use a default value
+                                    value = index == 1000 ? 1.0 : 0.7;
+                                  }
 
-                                final isCenter = value > 0.9;
-                                final isSide = value > 0.4 && !isCenter;
-                                final height = isCenter
-                                    ? 280.h
-                                    : isSide
-                                    ? 220.h
-                                    : 180.h;
-                                final scale = isCenter
-                                    ? 1.0
-                                    : isSide
-                                    ? 0.85
-                                    : 0.7;
+                                  final isCenter = value > 0.9;
+                                  final isSide = value > 0.4 && !isCenter;
+                                  final height = isCenter
+                                      ? 280.h
+                                      : isSide
+                                      ? 220.h
+                                      : 180.h;
+                                  final scale = isCenter
+                                      ? 1.0
+                                      : isSide
+                                      ? 0.85
+                                      : 0.7;
 
-                                return Column(
-                                  children: [
-                                    Transform.scale(
-                                      scale: scale,
-                                      child: Container(
-                                        height: height,
-                                        margin: EdgeInsets.symmetric(
-                                          horizontal: 8.w,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          image: DecorationImage(
-                                            image:
-                                                game.imageUrl.startsWith('http')
-                                                ? NetworkImage(game.imageUrl)
-                                                : AssetImage(game.imageUrl)
-                                                      as ImageProvider,
-                                            fit: BoxFit.cover,
-                                            onError: (exception, stackTrace) {
-                                              // Fallback to placeholder if image fails
-                                            },
-                                          ),
-                                          borderRadius: BorderRadius.circular(
-                                            20.r,
-                                          ),
-                                          boxShadow: [
-                                            BoxShadow(
-                                              color: Colors.black.withOpacity(
-                                                0.3,
-                                              ),
-                                              blurRadius: isCenter
-                                                  ? 20.r
-                                                  : 10.r,
-                                              offset: Offset(
-                                                0,
-                                                isCenter ? 10.h : 5.h,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
+                                  return Column(
+                                    children: [
+                                      Transform.scale(
+                                        scale: scale,
                                         child: Container(
+                                          height: height,
+                                          margin: EdgeInsets.symmetric(
+                                            horizontal: 8.w,
+                                          ),
                                           decoration: BoxDecoration(
-                                            borderRadius: BorderRadius.circular(
-                                              20.r,
+                                            image: DecorationImage(
+                                              image: game.imageUrl
+                                                      .startsWith('http')
+                                                  ? NetworkImage(game.imageUrl)
+                                                  : AssetImage(game.imageUrl)
+                                                        as ImageProvider,
+                                              fit: BoxFit.cover,
+                                              onError:
+                                                  (exception, stackTrace) {
+                                                // Fallback to placeholder if image fails
+                                              },
                                             ),
-                                            gradient: LinearGradient(
-                                              begin: Alignment.topCenter,
-                                              end: Alignment.bottomCenter,
-                                              colors: [
-                                                Colors.transparent,
-                                                Colors.black.withOpacity(0.8),
-                                              ],
-                                            ),
-                                            // Glass effect overlay for side cards
-                                            color: Colors.black.withOpacity(
-                                              isCenter
-                                                  ? 0.0
-                                                  : isSide
-                                                  ? 0.3
-                                                  : 0.5,
+                                            borderRadius:
+                                                BorderRadius.circular(20.r),
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: Colors.black
+                                                    .withOpacity(0.3),
+                                                blurRadius:
+                                                    isCenter ? 20.r : 10.r,
+                                                offset: Offset(
+                                                  0,
+                                                  isCenter ? 10.h : 5.h,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          child: Container(
+                                            decoration: BoxDecoration(
+                                              borderRadius:
+                                                  BorderRadius.circular(20.r),
+                                              gradient: LinearGradient(
+                                                begin: Alignment.topCenter,
+                                                end: Alignment.bottomCenter,
+                                                colors: [
+                                                  Colors.transparent,
+                                                  Colors.black.withOpacity(0.8),
+                                                ],
+                                              ),
+                                              // Glass effect overlay for side cards
+                                              color: Colors.black.withOpacity(
+                                                isCenter
+                                                    ? 0.0
+                                                    : isSide
+                                                    ? 0.3
+                                                    : 0.5,
+                                              ),
                                             ),
                                           ),
                                         ),
                                       ),
-                                    ),
-                                    12.verticalSpace,
-                                    // Title below the image
-                                    Expanded(
-                                      child: Text(
-                                        game.title,
-                                        style: AppTextStyles.lufgaLarge
-                                            .copyWith(
-                                              color: Colors.white,
-                                              fontSize: isCenter
-                                                  ? 18.sp
-                                                  : 14.sp,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                        textAlign: TextAlign.center,
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
+                                      12.verticalSpace,
+                                      // Title below the image
+                                      Expanded(
+                                        child: Text(
+                                          game.title,
+                                          style: AppTextStyles.lufgaLarge
+                                              .copyWith(
+                                            color: Colors.white,
+                                            fontSize: isCenter ? 18.sp : 14.sp,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                          textAlign: TextAlign.center,
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
                                       ),
-                                    ),
-                                  ],
+                                    ],
+                                  );
+                                },
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                15.verticalSpace,
+                // More Games Section
+                _isLoadingGames || featuredGames.isEmpty
+                    ? SizedBox.shrink()
+                    : Column(
+                        children: [
+                          Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 16.w),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  'New Release',
+                                  style: AppTextStyles.lufgaLarge.copyWith(
+                                    color: Colors.white,
+                                    fontSize: 20.sp,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          16.verticalSpace,
+                          Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 16.w),
+                            child: GridView.builder(
+                              shrinkWrap: true,
+                              physics: NeverScrollableScrollPhysics(),
+                              gridDelegate:
+                                  SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: 3,
+                                crossAxisSpacing: 16.w,
+                                mainAxisSpacing: 16.h,
+                                childAspectRatio: 0.45,
+                              ),
+                              itemCount: featuredGames.length > 6
+                                  ? 6
+                                  : featuredGames.length, // Show max 6 games
+                              itemBuilder: (context, index) {
+                                final game = featuredGames[index];
+                                return GestureDetector(
+                                  onTap: () {
+                                    AppRouter.routeTo(
+                                      context,
+                                      GameDetailScreen(game: game),
+                                    );
+                                  },
+                                  child: GlobalCard(
+                                    title: game.title,
+                                    author: game.subtitle,
+                                    imageAsset: game.imageUrl,
+                                    listenTime: '',
+                                    readTime: '',
+                                  ),
                                 );
                               },
                             ),
-                          );
-                        },
+                          ),
+                        ],
                       ),
-                    ),
+              ] else ...[
+                // Search Results
+                StreamBuilder<List<GameModel>>(
+                  key: ValueKey('games_search_${_searchQuery.trim().toLowerCase()}'),
+                  stream: GameService.searchGames(_searchQuery),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting &&
+                        !snapshot.hasData) {
+                      return SizedBox(
+                        height: 400.h,
+                        child: Center(
+                          child: ThreeDotLoader(
+                            color: AppColors.primaryColor,
+                            size: 12.w,
+                            spacing: 8.w,
+                          ),
+                        ),
+                      );
+                    }
 
-              15.verticalSpace,
+                    if (snapshot.hasError) {
+                      return Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 16.w),
+                        child: Center(
+                          child: Text(
+                            'Error loading games',
+                            style: AppTextStyles.regular.copyWith(
+                              color: Colors.white.withOpacity(0.6),
+                              fontSize: 14.sp,
+                            ),
+                          ),
+                        ),
+                      );
+                    }
 
-              // More Games Section
-              _isLoadingGames || featuredGames.isEmpty
-                  ? SizedBox.shrink()
-                  : Column(
+                    final games = snapshot.data ?? [];
+
+                    if (games.isEmpty) {
+                      return Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 16.w),
+                        child: Center(
+                          child: Text(
+                            'No games found',
+                            style: AppTextStyles.regular.copyWith(
+                              color: Colors.white.withOpacity(0.5),
+                              fontSize: 14.sp,
+                            ),
+                          ),
+                        ),
+                      );
+                    }
+
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Padding(
                           padding: EdgeInsets.symmetric(horizontal: 16.w),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                'New Release',
-                                style: AppTextStyles.lufgaLarge.copyWith(
-                                  color: Colors.white,
-                                  fontSize: 20.sp,
-                                ),
-                              ),
-                              // Text(
-                              //   'View all',
-                              //   style: AppTextStyles.medium.copyWith(
-                              //     color: AppColors.primaryColor,
-                              //     fontSize: 12.sp,
-                              //   ),
-                              // ),
-                            ],
+                          child: Text(
+                            'Search Results',
+                            style: AppTextStyles.lufgaLarge.copyWith(
+                              color: Colors.white,
+                              fontSize: 20.sp,
+                            ),
                           ),
                         ),
                         16.verticalSpace,
@@ -451,16 +483,14 @@ class _GamesScreenState extends State<GamesScreen> {
                             physics: NeverScrollableScrollPhysics(),
                             gridDelegate:
                                 SliverGridDelegateWithFixedCrossAxisCount(
-                                  crossAxisCount: 3,
-                                  crossAxisSpacing: 16.w,
-                                  mainAxisSpacing: 16.h,
-                                  childAspectRatio: 0.45,
-                                ),
-                            itemCount: featuredGames.length > 6
-                                ? 6
-                                : featuredGames.length, // Show max 6 games
+                              crossAxisCount: 3,
+                              crossAxisSpacing: 16.w,
+                              mainAxisSpacing: 16.h,
+                              childAspectRatio: 0.45,
+                            ),
+                            itemCount: games.length,
                             itemBuilder: (context, index) {
-                              final game = featuredGames[index];
+                              final game = games[index];
                               return GestureDetector(
                                 onTap: () {
                                   AppRouter.routeTo(
@@ -480,7 +510,10 @@ class _GamesScreenState extends State<GamesScreen> {
                           ),
                         ),
                       ],
-                    ),
+                    );
+                  },
+                ),
+              ],
 
               40.verticalSpace,
             ],

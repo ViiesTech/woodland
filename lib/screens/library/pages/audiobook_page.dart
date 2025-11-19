@@ -205,7 +205,7 @@ class _AudiobookPageState extends State<AudiobookPage>
                                         crossAxisCount: 3,
                                         crossAxisSpacing: 16.w,
                                         mainAxisSpacing: 16.h,
-                                        childAspectRatio: 0.52,
+                                        childAspectRatio: isAdmin ? 0.48 : 0.52,
                                       ),
                                   itemCount: trendingBooks.length,
                                   itemBuilder: (context, index) {
@@ -217,10 +217,7 @@ class _AudiobookPageState extends State<AudiobookPage>
                             },
                           ),
                           26.verticalSpace,
-                        ],
-
-                        // Audiobooks List
-                        if (_searchQuery.isEmpty) ...[
+                          // Audiobooks List
                           16.verticalSpace,
                           Padding(
                             padding: EdgeInsets.symmetric(horizontal: 16.w),
@@ -243,9 +240,42 @@ class _AudiobookPageState extends State<AudiobookPage>
                                     crossAxisCount: 3,
                                     crossAxisSpacing: 16.w,
                                     mainAxisSpacing: 16.h,
-                                    childAspectRatio: 0.52,
+                                    childAspectRatio: isAdmin ? 0.48 : 0.52,
                                   ),
                               itemCount: books.length > 6 ? 6 : books.length,
+                              itemBuilder: (context, index) {
+                                final book = books[index];
+                                final progress = _getBookProgress(book.id);
+                                return _buildBookCard(book, progress: progress);
+                              },
+                            ),
+                          ),
+                        ] else ...[
+                          // Search Results
+                          Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 16.w),
+                            child: Text(
+                              'Search Results',
+                              style: AppTextStyles.lufgaLarge.copyWith(
+                                color: Colors.white,
+                                fontSize: 20.sp,
+                              ),
+                            ),
+                          ),
+                          16.verticalSpace,
+                          Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 16.w),
+                            child: GridView.builder(
+                              shrinkWrap: true,
+                              physics: NeverScrollableScrollPhysics(),
+                              gridDelegate:
+                                  SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: 3,
+                                    crossAxisSpacing: 16.w,
+                                    mainAxisSpacing: 16.h,
+                                    childAspectRatio: isAdmin ? 0.48 : 0.52,
+                                  ),
+                              itemCount: books.length,
                               itemBuilder: (context, index) {
                                 final book = books[index];
                                 final progress = _getBookProgress(book.id);

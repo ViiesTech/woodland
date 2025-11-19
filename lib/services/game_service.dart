@@ -84,18 +84,28 @@ class GameService {
     }
   }
 
-  // Search games
+  // Search games (case-insensitive)
   static Stream<List<GameModel>> searchGames(String query) {
+    final queryLower = query.trim().toLowerCase();
+    
+    // If query is empty, return empty list
+    if (queryLower.isEmpty) {
+      return Stream.value([]);
+    }
+    
     return _firestore
         .collection(_gamesCollection)
         .where('isPublished', isEqualTo: true)
-        .orderBy('title')
-        .startAt([query])
-        .endAt(['$query\uf8ff'])
         .snapshots()
         .map((snapshot) {
       return snapshot.docs
           .map((doc) => GameModel.fromFirestore(doc.id, doc.data()))
+          .where((game) {
+            final titleLower = game.title.toLowerCase().trim();
+            final subtitleLower = game.subtitle.toLowerCase().trim();
+            return titleLower.contains(queryLower) ||
+                subtitleLower.contains(queryLower);
+          })
           .toList();
     });
   }

@@ -303,7 +303,7 @@ class _EbookPageState extends State<EbookPage>
                                   crossAxisCount: 3,
                                   crossAxisSpacing: 16.w,
                                   mainAxisSpacing: 16.h,
-                                  childAspectRatio: 0.52,
+                                  childAspectRatio: isAdmin ? 0.48 : 0.52,
                                 ),
                             itemCount: books.length,
                             itemBuilder: (context, index) {

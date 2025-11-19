@@ -6,6 +6,7 @@ class ReadingProgressService {
 
   /// Save or update reading progress for an ebook
   /// Only increments readCount for unique users (first time reading)
+  /// Limits to 5 most recent books to prevent flickering
   static Future<void> saveProgress({
     required String userId,
     required String bookId,
@@ -56,9 +57,47 @@ class ReadingProgressService {
       // Save/update the reading progress document (after increment to ensure order)
       await docRef.set(updateData, SetOptions(merge: true));
       print('📚 ✅ Reading progress document saved for book $bookId, user $userId');
+      
+      // Limit to 5 most recent books - delete oldest if we exceed limit
+      await _limitReadingProgress(userId, maxItems: 5);
     } catch (e) {
       print('❌ Error saving reading progress: $e');
       print('❌ Error stack: ${e.toString()}');
+    }
+  }
+
+  /// Limit reading progress to maxItems, deleting the oldest ones
+  static Future<void> _limitReadingProgress(String userId, {int maxItems = 5}) async {
+    try {
+      final snapshot = await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('readingProgress')
+          .get();
+      
+      if (snapshot.docs.length <= maxItems) {
+        return; // No need to delete anything
+      }
+      
+      // Sort by lastUpdated (oldest first)
+      final sortedDocs = snapshot.docs.toList()
+        ..sort((a, b) {
+          final aTime = a.data()['lastUpdated'] as Timestamp?;
+          final bTime = b.data()['lastUpdated'] as Timestamp?;
+          if (aTime == null && bTime == null) return 0;
+          if (aTime == null) return 1;
+          if (bTime == null) return -1;
+          return aTime.compareTo(bTime); // Oldest first
+        });
+      
+      // Delete oldest items that exceed the limit
+      final itemsToDelete = sortedDocs.length - maxItems;
+      for (int i = 0; i < itemsToDelete; i++) {
+        await sortedDocs[i].reference.delete();
+        print('🗑️ Deleted oldest reading progress: ${sortedDocs[i].id}');
+      }
+    } catch (e) {
+      print('❌ Error limiting reading progress: $e');
     }
   }
 

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:the_woodlands_series/Components/textfield/primary_textfield.dart';
 import 'package:the_woodlands_series/components/card/global_card.dart';
@@ -18,6 +17,7 @@ import 'package:the_woodlands_series/admin_panel/models/book_model.dart';
 import 'package:the_woodlands_series/screens/book_detail/book_detail_screen.dart';
 import 'package:the_woodlands_series/components/utils/three_dot_loader.dart';
 import 'package:the_woodlands_series/components/button/bookmark_icon_button.dart';
+import 'package:the_woodlands_series/screens/search/search_screen.dart';
 
 import '../../components/resource/app_colors.dart';
 
@@ -120,6 +120,11 @@ class _HomeScreenState extends State<HomeScreen> {
                     prefixIcon: Icon(Icons.search, size: 20.sp),
                     height: 55.h,
                     verticalPad: 10.h,
+                    readOnly: true,
+                    isEnabled: false,
+                    onTap: () {
+                      AppRouter.routeTo(context, const SearchScreen());
+                    },
                   ),
                   15.verticalSpace,
                 ],
@@ -144,11 +149,30 @@ class _HomeScreenState extends State<HomeScreen> {
                             authState.user.id,
                           ),
                           builder: (context, progressSnapshot) {
-                            final hasProgress =
-                                progressSnapshot.hasData &&
-                                progressSnapshot.data!.isNotEmpty;
+                            if (!progressSnapshot.hasData ||
+                                progressSnapshot.data!.isEmpty) {
+                              return SizedBox.shrink();
+                            }
 
-                            if (!hasProgress) {
+                            // Check if there are any incomplete books (not 100% complete)
+                            final hasIncompleteBooks = progressSnapshot
+                                .data!
+                                .entries
+                                .any((entry) {
+                                  final progress = entry.value;
+                                  final currentPage =
+                                      progress['currentPage'] as int? ?? 1;
+                                  final totalPages =
+                                      progress['totalPages'] as int? ?? 1;
+                                  if (totalPages <= 0)
+                                    return true; // Keep if total pages is invalid
+                                  final progressPercent =
+                                      (currentPage / totalPages) * 100;
+                                  return progressPercent <
+                                      100; // Only include books that are not 100% complete
+                                });
+
+                            if (!hasIncompleteBooks) {
                               return SizedBox.shrink();
                             }
 
@@ -174,61 +198,61 @@ class _HomeScreenState extends State<HomeScreen> {
                         );
                       },
                     ),
-                    SizedBox(
-                      height: 45.h,
-                      child: ListView.builder(
-                        scrollDirection: Axis.horizontal,
-                        itemCount: categories.length,
-                        padding: EdgeInsets.symmetric(horizontal: 16.w),
-                        itemBuilder: (context, index) {
-                          final isSelected = selectedCategoryIndex == index;
-                          return GestureDetector(
-                            onTap: () {
-                              setState(() {
-                                selectedCategoryIndex = index;
-                              });
-                            },
-                            child: Container(
-                              margin: EdgeInsets.only(right: 12.w),
-                              decoration: BoxDecoration(
-                                color: isSelected
-                                    ? AppColors.boxClr
-                                    : Colors.transparent,
-                                borderRadius: BorderRadius.circular(10.r),
-                              ),
-                              padding: EdgeInsets.symmetric(
-                                horizontal: 16.w,
-                                vertical: 10.h,
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  SvgPicture.asset(
-                                    categories[index]['icon']!,
-                                    height: 18.h,
-                                    colorFilter: ColorFilter.mode(
-                                      isSelected ? Colors.white : Colors.white,
-                                      BlendMode.srcIn,
-                                    ),
-                                  ),
-                                  5.horizontalSpace,
-                                  Text(
-                                    categories[index]['title']!,
-                                    style: AppTextStyles.medium.copyWith(
-                                      color: isSelected
-                                          ? Colors.white
-                                          : Colors.white,
-                                      fontSize: 14.sp,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                    40.verticalSpace,
+                    // SizedBox(
+                    //   height: 45.h,
+                    //   child: ListView.builder(
+                    //     scrollDirection: Axis.horizontal,
+                    //     itemCount: categories.length,
+                    //     padding: EdgeInsets.symmetric(horizontal: 16.w),
+                    //     itemBuilder: (context, index) {
+                    //       final isSelected = selectedCategoryIndex == index;
+                    //       return GestureDetector(
+                    //         onTap: () {
+                    //           setState(() {
+                    //             selectedCategoryIndex = index;
+                    //           });
+                    //         },
+                    //         child: Container(
+                    //           margin: EdgeInsets.only(right: 12.w),
+                    //           decoration: BoxDecoration(
+                    //             color: isSelected
+                    //                 ? AppColors.boxClr
+                    //                 : Colors.transparent,
+                    //             borderRadius: BorderRadius.circular(10.r),
+                    //           ),
+                    //           padding: EdgeInsets.symmetric(
+                    //             horizontal: 16.w,
+                    //             vertical: 10.h,
+                    //           ),
+                    //           child: Row(
+                    //             mainAxisSize: MainAxisSize.min,
+                    //             children: [
+                    //               SvgPicture.asset(
+                    //                 categories[index]['icon']!,
+                    //                 height: 18.h,
+                    //                 colorFilter: ColorFilter.mode(
+                    //                   isSelected ? Colors.white : Colors.white,
+                    //                   BlendMode.srcIn,
+                    //                 ),
+                    //               ),
+                    //               5.horizontalSpace,
+                    //               Text(
+                    //                 categories[index]['title']!,
+                    //                 style: AppTextStyles.medium.copyWith(
+                    //                   color: isSelected
+                    //                       ? Colors.white
+                    //                       : Colors.white,
+                    //                   fontSize: 14.sp,
+                    //                 ),
+                    //               ),
+                    //             ],
+                    //           ),
+                    //         ),
+                    //       );
+                    //     },
+                    //   ),
+                    // ),
+                    // 40.verticalSpace,
                     // Top Trending Section
                     BlocBuilder<AuthBloc, AuthState>(
                       builder: (context, state) {
@@ -254,13 +278,13 @@ class _HomeScreenState extends State<HomeScreen> {
                                       fontSize: 20.sp,
                                     ),
                                   ),
-                                  Text(
-                                    'View all',
-                                    style: AppTextStyles.medium.copyWith(
-                                      color: AppColors.primaryColor,
-                                      fontSize: 12.sp,
-                                    ),
-                                  ),
+                                  // Text(
+                                  //   'View all',
+                                  //   style: AppTextStyles.medium.copyWith(
+                                  //     color: AppColors.primaryColor,
+                                  //     fontSize: 12.sp,
+                                  //   ),
+                                  // ),
                                 ],
                               ),
                             ),
@@ -369,13 +393,13 @@ class _HomeScreenState extends State<HomeScreen> {
                                       fontSize: 20.sp,
                                     ),
                                   ),
-                                  Text(
-                                    'View all',
-                                    style: AppTextStyles.medium.copyWith(
-                                      color: AppColors.primaryColor,
-                                      fontSize: 12.sp,
-                                    ),
-                                  ),
+                                  // Text(
+                                  //   'View all',
+                                  //   style: AppTextStyles.medium.copyWith(
+                                  //     color: AppColors.primaryColor,
+                                  //     fontSize: 12.sp,
+                                  //   ),
+                                  // ),
                                 ],
                               ),
                             ),

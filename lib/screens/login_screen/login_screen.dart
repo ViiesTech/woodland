@@ -11,6 +11,7 @@ import 'package:the_woodlands_series/components/resource/app_textstyle.dart';
 import 'package:the_woodlands_series/components/textfield/primary_textfield.dart';
 import 'package:the_woodlands_series/components/utils/custom_toast.dart';
 import 'package:the_woodlands_series/screens/register/register_screen.dart';
+import 'package:the_woodlands_series/screens/forgot_password/forgot_password_screen.dart';
 import 'package:the_woodlands_series/bloc/auth/auth_bloc.dart';
 import 'package:the_woodlands_series/bloc/auth/auth_event.dart';
 import 'package:the_woodlands_series/bloc/auth/auth_state.dart';
@@ -284,7 +285,10 @@ class _LoginScreenState extends State<LoginScreen> {
                       // Forgot Password
                       TextButton(
                         onPressed: () {
-                          // Handle forgot password
+                          AppRouter.routeTo(
+                            context,
+                            const ForgotPasswordScreen(),
+                          );
                         },
                         style: TextButton.styleFrom(
                           padding: EdgeInsets.symmetric(horizontal: 8.w),

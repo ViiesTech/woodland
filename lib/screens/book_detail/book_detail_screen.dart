@@ -34,6 +34,8 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
   bool _isUpdating = false;
   bool _isBookmarked = false;
   String? _currentUserId;
+  List<BookModel> _similarBooks = [];
+  bool _isLoadingSimilarBooks = true;
 
   @override
   void initState() {
@@ -42,6 +44,7 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
     _refreshBookData();
     _loadBookmarkStatus();
     _markBookAsViewed();
+    _loadSimilarBooks();
   }
 
   void _markBookAsViewed() {
@@ -107,12 +110,65 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
     try {
       final updatedBook = await BookService.getBookById(widget.book.id);
       if (updatedBook != null && mounted) {
+        final categoryChanged = _book.category != updatedBook.category;
         setState(() {
           _book = updatedBook;
         });
+        // Reload similar books if category changed
+        if (categoryChanged) {
+          _loadSimilarBooks();
+        }
       }
     } catch (e) {
       print('Error refreshing book data: $e');
+    }
+  }
+
+  Future<void> _loadSimilarBooks() async {
+    try {
+      setState(() {
+        _isLoadingSimilarBooks = true;
+      });
+
+      // Get all published books
+      final booksStream = BookService.getAllPublishedBooks();
+      await booksStream.first.then((allBooks) {
+        if (!mounted) return;
+
+        // Filter out the current book
+        final otherBooks = allBooks
+            .where((book) => book.id != _book.id)
+            .toList();
+
+        // Separate books by category match
+        final sameCategoryBooks = otherBooks
+            .where((book) => book.category == _book.category)
+            .toList();
+        final differentCategoryBooks = otherBooks
+            .where((book) => book.category != _book.category)
+            .toList();
+
+        // Prioritize same category, then add others to reach 5
+        List<BookModel> similarBooks = [];
+        similarBooks.addAll(sameCategoryBooks.take(5));
+
+        if (similarBooks.length < 5) {
+          final remaining = 5 - similarBooks.length;
+          similarBooks.addAll(differentCategoryBooks.take(remaining));
+        }
+
+        setState(() {
+          _similarBooks = similarBooks;
+          _isLoadingSimilarBooks = false;
+        });
+      });
+    } catch (e) {
+      print('Error loading similar books: $e');
+      if (mounted) {
+        setState(() {
+          _isLoadingSimilarBooks = false;
+        });
+      }
     }
   }
 
@@ -307,27 +363,27 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
                                             state.user.role == 'admin';
                                         return Row(
                                           mainAxisAlignment:
-                                              MainAxisAlignment.spaceBetween,
+                                              MainAxisAlignment.end,
                                           children: [
-                                            Row(
-                                              children: [
-                                                Icon(
-                                                  Icons.access_time,
-                                                  color: AppColors.primaryColor,
-                                                  size: 18.sp,
-                                                ),
-                                                5.horizontalSpace,
-                                                Text(
-                                                  '${_book.readTime} min',
-                                                  style: AppTextStyles.medium
-                                                      .copyWith(
-                                                        color: AppColors
-                                                            .primaryColor,
-                                                        fontSize: 14.sp,
-                                                      ),
-                                                ),
-                                              ],
-                                            ),
+                                            // Row(
+                                            //   children: [
+                                            //     Icon(
+                                            //       Icons.access_time,
+                                            //       color: AppColors.primaryColor,
+                                            //       size: 18.sp,
+                                            //     ),
+                                            //     5.horizontalSpace,
+                                            //     Text(
+                                            //       '${_book.readTime} min',
+                                            //       style: AppTextStyles.medium
+                                            //           .copyWith(
+                                            //             color: AppColors
+                                            //                 .primaryColor,
+                                            //             fontSize: 14.sp,
+                                            //           ),
+                                            //     ),
+                                            //   ],
+                                            // ),
                                             if (isAdmin)
                                               Row(
                                                 children: [
@@ -387,125 +443,229 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
                                       ),
                                     ),
                                     16.verticalSpace,
-                                    SizedBox(
-                                      height: 200.h,
-                                      child: ListView.builder(
-                                        scrollDirection: Axis.horizontal,
-                                        itemCount: 3,
-                                        itemBuilder: (context, index) {
-                                          final books = [
-                                            {
-                                              'title': 'Glenn s duquette',
-                                              'author': 'Mark mcallister',
-                                              'image':
-                                                  'assets/tempImg/temp1.png',
-                                            },
-                                            {
-                                              'title': 'ODE TO SIR',
-                                              'author': 'Mark mcallister',
-                                              'image':
-                                                  'assets/tempImg/temp2.png',
-                                            },
-                                            {
-                                              'title': 'Sunflower',
-                                              'author': 'Mark mcallister',
-                                              'image':
-                                                  'assets/tempImg/temp3.png',
-                                            },
-                                          ];
-                                          final book = books[index];
-                                          return Container(
-                                            width: 140.w,
-                                            margin: EdgeInsets.only(
-                                              right: 16.w,
+                                    _isLoadingSimilarBooks
+                                        ? SizedBox(
+                                            height: 200.h,
+                                            child: Center(
+                                              child: CircularProgressIndicator(
+                                                color: AppColors.primaryColor,
+                                              ),
                                             ),
-                                            child: Column(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
-                                              children: [
-                                                Container(
-                                                  height: 120.h,
-                                                  decoration: BoxDecoration(
-                                                    image: DecorationImage(
-                                                      image: AssetImage(
-                                                        book['image']!,
-                                                      ),
-                                                      fit: BoxFit.cover,
+                                          )
+                                        : _similarBooks.isEmpty
+                                        ? SizedBox(
+                                            height: 200.h,
+                                            child: Center(
+                                              child: Text(
+                                                'No similar books found',
+                                                style: AppTextStyles.regular
+                                                    .copyWith(
+                                                      color: Colors.grey[400],
+                                                      fontSize: 14.sp,
                                                     ),
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                          8.r,
+                                              ),
+                                            ),
+                                          )
+                                        : SizedBox(
+                                            height: 200.h,
+                                            child: ListView.builder(
+                                              scrollDirection: Axis.horizontal,
+                                              itemCount: _similarBooks.length,
+                                              itemBuilder: (context, index) {
+                                                final book =
+                                                    _similarBooks[index];
+                                                return GestureDetector(
+                                                  onTap: () {
+                                                    AppRouter.routeTo(
+                                                      context,
+                                                      BookDetailScreen(
+                                                        book: book,
+                                                      ),
+                                                    );
+                                                  },
+                                                  child: Container(
+                                                    width: 140.w,
+                                                    margin: EdgeInsets.only(
+                                                      right: 16.w,
+                                                    ),
+                                                    child: Column(
+                                                      crossAxisAlignment:
+                                                          CrossAxisAlignment
+                                                              .start,
+                                                      children: [
+                                                        Container(
+                                                          height: 120.h,
+                                                          decoration: BoxDecoration(
+                                                            image: DecorationImage(
+                                                              image:
+                                                                  book
+                                                                      .coverImageUrl
+                                                                      .isNotEmpty
+                                                                  ? (book.coverImageUrl.startsWith(
+                                                                          'http',
+                                                                        )
+                                                                        ? NetworkImage(
+                                                                                book.coverImageUrl,
+                                                                              )
+                                                                              as ImageProvider
+                                                                        : AssetImage(
+                                                                            book.coverImageUrl,
+                                                                          ))
+                                                                  : AssetImage(
+                                                                      'assets/tempImg/temp1.png',
+                                                                    ),
+                                                              fit: BoxFit.cover,
+                                                              onError:
+                                                                  (
+                                                                    exception,
+                                                                    stackTrace,
+                                                                  ) {
+                                                                    // Handle error silently
+                                                                  },
+                                                            ),
+                                                            borderRadius:
+                                                                BorderRadius.circular(
+                                                                  8.r,
+                                                                ),
+                                                          ),
                                                         ),
+                                                        8.verticalSpace,
+                                                        Text(
+                                                          book.title,
+                                                          style: AppTextStyles
+                                                              .medium
+                                                              .copyWith(
+                                                                color: Colors
+                                                                    .white,
+                                                                fontSize: 12.sp,
+                                                              ),
+                                                          maxLines: 2,
+                                                          overflow: TextOverflow
+                                                              .ellipsis,
+                                                        ),
+                                                        4.verticalSpace,
+                                                        Text(
+                                                          book.author,
+                                                          style: AppTextStyles
+                                                              .regular
+                                                              .copyWith(
+                                                                color: Colors
+                                                                    .grey[400],
+                                                                fontSize: 10.sp,
+                                                              ),
+                                                          maxLines: 1,
+                                                          overflow: TextOverflow
+                                                              .ellipsis,
+                                                        ),
+                                                        8.verticalSpace,
+                                                        Builder(
+                                                          builder: (context) {
+                                                            final hasTime =
+                                                                (book.type ==
+                                                                        BookType
+                                                                            .audiobook &&
+                                                                    book.listenTime >
+                                                                        0) ||
+                                                                (book.type ==
+                                                                        BookType
+                                                                            .ebook &&
+                                                                    book.readTime >
+                                                                        0);
+                                                            final hasViewCount =
+                                                                book.viewCount >
+                                                                0;
+
+                                                            if (!hasTime &&
+                                                                !hasViewCount) {
+                                                              return SizedBox.shrink();
+                                                            }
+
+                                                            return Row(
+                                                              children: [
+                                                                if (book.type ==
+                                                                    BookType
+                                                                        .audiobook)
+                                                                  if (book.listenTime >
+                                                                      0) ...[
+                                                                    Icon(
+                                                                      Icons
+                                                                          .headphones,
+                                                                      color: Colors
+                                                                          .grey[400],
+                                                                      size:
+                                                                          10.sp,
+                                                                    ),
+                                                                    2.horizontalSpace,
+                                                                    Text(
+                                                                      '${book.listenTime}m',
+                                                                      style: AppTextStyles.regular.copyWith(
+                                                                        color: Colors
+                                                                            .grey[400],
+                                                                        fontSize:
+                                                                            10.sp,
+                                                                      ),
+                                                                    ),
+                                                                    if (hasViewCount)
+                                                                      8.horizontalSpace,
+                                                                  ],
+                                                                if (book.type ==
+                                                                    BookType
+                                                                        .ebook)
+                                                                  if (book.readTime >
+                                                                      0) ...[
+                                                                    Icon(
+                                                                      Icons
+                                                                          .menu_book,
+                                                                      color: Colors
+                                                                          .grey[400],
+                                                                      size:
+                                                                          10.sp,
+                                                                    ),
+                                                                    2.horizontalSpace,
+                                                                    Text(
+                                                                      '${book.readTime}m',
+                                                                      style: AppTextStyles.regular.copyWith(
+                                                                        color: Colors
+                                                                            .grey[400],
+                                                                        fontSize:
+                                                                            10.sp,
+                                                                      ),
+                                                                    ),
+                                                                    if (hasViewCount)
+                                                                      8.horizontalSpace,
+                                                                  ],
+                                                                if (hasViewCount) ...[
+                                                                  Icon(
+                                                                    Icons
+                                                                        .visibility,
+                                                                    color: Colors
+                                                                        .grey[400],
+                                                                    size: 10.sp,
+                                                                  ),
+                                                                  2.horizontalSpace,
+                                                                  Text(
+                                                                    '${book.viewCount}',
+                                                                    style: AppTextStyles
+                                                                        .regular
+                                                                        .copyWith(
+                                                                          color:
+                                                                              Colors.grey[400],
+                                                                          fontSize:
+                                                                              10.sp,
+                                                                        ),
+                                                                  ),
+                                                                ],
+                                                              ],
+                                                            );
+                                                          },
+                                                        ),
+                                                      ],
+                                                    ),
                                                   ),
-                                                ),
-                                                8.verticalSpace,
-                                                Text(
-                                                  book['title']!,
-                                                  style: AppTextStyles.medium
-                                                      .copyWith(
-                                                        color: Colors.white,
-                                                        fontSize: 12.sp,
-                                                      ),
-                                                  maxLines: 2,
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
-                                                ),
-                                                4.verticalSpace,
-                                                Text(
-                                                  book['author']!,
-                                                  style: AppTextStyles.regular
-                                                      .copyWith(
-                                                        color: Colors.grey[400],
-                                                        fontSize: 10.sp,
-                                                      ),
-                                                  maxLines: 1,
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
-                                                ),
-                                                8.verticalSpace,
-                                                Row(
-                                                  children: [
-                                                    Icon(
-                                                      Icons.headphones,
-                                                      color: Colors.grey[400],
-                                                      size: 10.sp,
-                                                    ),
-                                                    2.horizontalSpace,
-                                                    Text(
-                                                      '5m',
-                                                      style: AppTextStyles
-                                                          .regular
-                                                          .copyWith(
-                                                            color: Colors
-                                                                .grey[400],
-                                                            fontSize: 10.sp,
-                                                          ),
-                                                    ),
-                                                    8.horizontalSpace,
-                                                    Icon(
-                                                      Icons.visibility,
-                                                      color: Colors.grey[400],
-                                                      size: 10.sp,
-                                                    ),
-                                                    2.horizontalSpace,
-                                                    Text(
-                                                      '8m',
-                                                      style: AppTextStyles
-                                                          .regular
-                                                          .copyWith(
-                                                            color: Colors
-                                                                .grey[400],
-                                                            fontSize: 10.sp,
-                                                          ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ],
+                                                );
+                                              },
                                             ),
-                                          );
-                                        },
-                                      ),
-                                    ),
+                                          ),
                                     20.verticalSpace,
                                   ],
                                 ),
