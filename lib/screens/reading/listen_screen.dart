@@ -871,59 +871,58 @@ class _ListenScreenState extends State<ListenScreen> {
                 ],
 
                 // Readings Section
-                Container(
-                  margin: EdgeInsets.symmetric(horizontal: 20.w),
-                  padding: EdgeInsets.all(20.w),
-                  decoration: BoxDecoration(
-                    color: AppColors.boxClr,
-                    borderRadius: BorderRadius.circular(16.r),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Readings Header
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            'Readings',
-                            style: AppTextStyles.lufgaLarge.copyWith(
-                              color: Colors.white,
-                              fontSize: 18.sp,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          SvgPicture.asset(AppAssets.fullIcon),
-                        ],
-                      ),
-                      16.verticalSpace,
+                // Container(
+                //   margin: EdgeInsets.symmetric(horizontal: 20.w),
+                //   padding: EdgeInsets.all(20.w),
+                //   decoration: BoxDecoration(
+                //     color: AppColors.boxClr,
+                //     borderRadius: BorderRadius.circular(16.r),
+                //   ),
+                //   child: Column(
+                //     crossAxisAlignment: CrossAxisAlignment.start,
+                //     children: [
+                //       // Readings Header
+                //       Row(
+                //         mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                //         children: [
+                //           Text(
+                //             'Readings',
+                //             style: AppTextStyles.lufgaLarge.copyWith(
+                //               color: Colors.white,
+                //               fontSize: 18.sp,
+                //               fontWeight: FontWeight.bold,
+                //             ),
+                //           ),
+                //           SvgPicture.asset(AppAssets.fullIcon),
+                //         ],
+                //       ),
+                //       16.verticalSpace,
 
-                      // Text Content
-                      Text(
-                        widget.book.description,
-                        style: AppTextStyles.regular.copyWith(
-                          color: Colors.white,
-                          fontSize: 14.sp,
-                          height: 1.6,
-                        ),
-                        textAlign: TextAlign.justify,
-                      ),
-                      20.verticalSpace,
+                //       // Text Content
+                //       Text(
+                //         widget.book.description,
+                //         style: AppTextStyles.regular.copyWith(
+                //           color: Colors.white,
+                //           fontSize: 14.sp,
+                //           height: 1.6,
+                //         ),
+                //         textAlign: TextAlign.justify,
+                //       ),
+                //       20.verticalSpace,
 
-                      // Share Button
-                      Align(
-                        alignment: Alignment.bottomRight,
-                        child: PrimaryButton(
-                          buttonWidth: 100.w,
-                          verPadding: 6.h,
-                          title: 'Share',
-                          icon: Icon(Icons.share_outlined, color: Colors.black),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
+                //       // Share Button
+                //       Align(
+                //         alignment: Alignment.bottomRight,
+                //         child: PrimaryButton(
+                //           buttonWidth: 100.w,
+                //           verPadding: 6.h,
+                //           title: 'Share',
+                //           icon: Icon(Icons.share_outlined, color: Colors.black),
+                //         ),
+                //       ),
+                //     ],
+                //   ),
+                // ),
                 40.verticalSpace,
               ],
             ),

@@ -164,6 +164,12 @@ class _ReadingScreenState extends State<ReadingScreen> {
         timeSpentMinutes: timeSpentMinutes,
       );
       print('✅ Reading progress saved successfully');
+      
+      // Check if book is completed - if so, it will be deleted by the service
+      final progressPercent = (validCurrentPage / validTotalPages) * 100;
+      if (progressPercent >= 100 && validTotalPages > 0) {
+        print('🎉 Book completed! Progress will be removed from continue reading.');
+      }
     } catch (e) {
       print('❌ Error saving reading progress: $e');
       print('❌ Error stack: ${e.toString()}');
@@ -411,231 +417,242 @@ Similique sunt in culpa qui officia deserunt mollitia animi, id est laborum et d
       return _buildDemoTextPagination();
     }
 
-    return Column(
-      children: [
-        Expanded(
-          child: Container(
-            color: const Color(0xff1B252D), // #1B252D background color
-            child: Stack(
-              children: [
-                // Dark background layer to cover everything
-                Container(color: const Color(0xff1B252D)),
-                // PDF Viewer
-                SfPdfViewerTheme(
-                  data: SfPdfViewerThemeData(
-                    backgroundColor: Colors
-                        .transparent, // Transparent so dark background shows through
-                    progressBarColor:
-                        Colors.transparent, // Hide default PDF loader
-                  ),
-                  child: Container(
-                    color: const Color(0xff1B252D), // Dark background container
-                    child: ColorFiltered(
-                      // Invert colors to convert white pages to dark and black text to white
-                      colorFilter: const ColorFilter.matrix([
-                        -1.0, 0.0, 0.0, 0.0, 255.0, // Red channel inverted
-                        0.0, -1.0, 0.0, 0.0, 255.0, // Green channel inverted
-                        0.0, 0.0, -1.0, 0.0, 255.0, // Blue channel inverted
-                        0.0, 0.0, 0.0, 1.0, 0.0, // Alpha channel unchanged
-                      ]),
-                      child: Opacity(
-                        opacity: _isPdfLoading
-                            ? 0
-                            : 1, // Hide PDF while loading
-                        child: SfPdfViewer.network(
-                          maxZoomLevel: 1,
-                          widget.book.pdfUrl!,
-                          controller: _pdfViewerController,
-                          enableDoubleTapZooming: true,
-                          pageLayoutMode: PdfPageLayoutMode
-                              .single, // Show only 1 page at a time
-                          scrollDirection: PdfScrollDirection
-                              .horizontal, // Horizontal for single page mode
-                          canShowScrollHead:
-                              false, // Hide side page numbers/indicators
-                          canShowScrollStatus: false,
+    return SafeArea(
+      top: false,
+      child: Column(
+        children: [
+          Expanded(
+            child: Container(
+              color: const Color(0xff1B252D), // #1B252D background color
+              child: Stack(
+                children: [
+                  // Dark background layer to cover everything
+                  Container(color: const Color(0xff1B252D)),
+                  // PDF Viewer
+                  SfPdfViewerTheme(
+                    data: SfPdfViewerThemeData(
+                      backgroundColor: Colors
+                          .transparent, // Transparent so dark background shows through
+                      progressBarColor:
+                          Colors.transparent, // Hide default PDF loader
+                    ),
+                    child: Container(
+                      color: const Color(
+                        0xff1B252D,
+                      ), // Dark background container
+                      child: ColorFiltered(
+                        // Invert colors to convert white pages to dark and black text to white
+                        colorFilter: const ColorFilter.matrix([
+                          -1.0, 0.0, 0.0, 0.0, 255.0, // Red channel inverted
+                          0.0, -1.0, 0.0, 0.0, 255.0, // Green channel inverted
+                          0.0, 0.0, -1.0, 0.0, 255.0, // Blue channel inverted
+                          0.0, 0.0, 0.0, 1.0, 0.0, // Alpha channel unchanged
+                        ]),
+                        child: Opacity(
+                          opacity: _isPdfLoading
+                              ? 0
+                              : 1, // Hide PDF while loading
+                          child: SfPdfViewer.network(
+                            maxZoomLevel: 1,
+                            widget.book.pdfUrl!,
+                            controller: _pdfViewerController,
+                            enableDoubleTapZooming: true,
+                            pageLayoutMode: PdfPageLayoutMode
+                                .single, // Show only 1 page at a time
+                            scrollDirection: PdfScrollDirection
+                                .horizontal, // Horizontal for single page mode
+                            canShowScrollHead:
+                                false, // Hide side page numbers/indicators
+                            canShowScrollStatus: false,
 
-                          onDocumentLoaded: (PdfDocumentLoadedDetails details) {
-                            print('✅ PDF loaded successfully!');
-                            print(
-                              '✅ Total pages: ${details.document.pages.count}',
-                            );
-                            print('✅ PDF URL: ${widget.book.pdfUrl}');
-                            if (mounted) {
-                              setState(() {
-                                _totalPages = details.document.pages.count;
-                                _useDemoText = false;
-                                _isPdfLoading = false; // PDF loaded
-                              });
-                              // Save initial progress with total pages
-                              _saveProgress();
-                            }
-                          },
-                          onDocumentLoadFailed:
-                              (PdfDocumentLoadFailedDetails details) {
-                                print('❌ PDF load failed!');
-                                print('❌ Error: ${details.error}');
-                                print(
-                                  '❌ Error description: ${details.description}',
-                                );
-                                print('❌ PDF URL was: ${widget.book.pdfUrl}');
+                            onDocumentLoaded: (PdfDocumentLoadedDetails details) {
+                              print('✅ PDF loaded successfully!');
+                              print(
+                                '✅ Total pages: ${details.document.pages.count}',
+                              );
+                              print('✅ PDF URL: ${widget.book.pdfUrl}');
+                              if (mounted) {
+                                setState(() {
+                                  _totalPages = details.document.pages.count;
+                                  _useDemoText = false;
+                                  _isPdfLoading = false; // PDF loaded
+                                });
+                                // Save initial progress with total pages
+                                _saveProgress();
+                              }
+                            },
+                            onDocumentLoadFailed:
+                                (PdfDocumentLoadFailedDetails details) {
+                                  print('❌ PDF load failed!');
+                                  print('❌ Error: ${details.error}');
+                                  print(
+                                    '❌ Error description: ${details.description}',
+                                  );
+                                  print('❌ PDF URL was: ${widget.book.pdfUrl}');
 
-                                // Only show demo text if there's a real error
-                                if (mounted) {
+                                  // Only show demo text if there's a real error
+                                  if (mounted) {
+                                    setState(() {
+                                      _useDemoText = true;
+                                      _currentPage = 1;
+                                      _totalPages = 2;
+                                      _isPdfLoading = false; // Stop loading
+                                    });
+                                  }
+                                },
+                            onPageChanged: (PdfPageChangedDetails details) {
+                              print(
+                                '📄 Page changed: ${details.newPageNumber}',
+                              );
+                              // Only update page if navigation was via button, otherwise revert
+                              if (mounted) {
+                                if (_isNavigatingViaButton) {
                                   setState(() {
-                                    _useDemoText = true;
-                                    _currentPage = 1;
-                                    _totalPages = 2;
-                                    _isPdfLoading = false; // Stop loading
+                                    _currentPage = details.newPageNumber;
+                                    _isNavigatingViaButton =
+                                        false; // Reset flag
+                                  });
+                                  // Save progress when page changes
+                                  _saveProgress();
+                                } else {
+                                  // Revert to previous page if changed via scroll
+                                  Future.delayed(Duration.zero, () {
+                                    if (_pdfViewerController != null &&
+                                        mounted) {
+                                      _pdfViewerController!.jumpToPage(
+                                        _currentPage,
+                                      );
+                                    }
                                   });
                                 }
-                              },
-                          onPageChanged: (PdfPageChangedDetails details) {
-                            print('📄 Page changed: ${details.newPageNumber}');
-                            // Only update page if navigation was via button, otherwise revert
-                            if (mounted) {
-                              if (_isNavigatingViaButton) {
-                                setState(() {
-                                  _currentPage = details.newPageNumber;
-                                  _isNavigatingViaButton = false; // Reset flag
-                                });
-                                // Save progress when page changes
-                                _saveProgress();
-                              } else {
-                                // Revert to previous page if changed via scroll
-                                Future.delayed(Duration.zero, () {
-                                  if (_pdfViewerController != null && mounted) {
-                                    _pdfViewerController!.jumpToPage(
-                                      _currentPage,
-                                    );
-                                  }
-                                });
                               }
-                            }
-                          },
+                            },
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
-                // Custom Loader
-                if (_isPdfLoading)
-                  Container(
-                    color: const Color(0xff1B252D), // Match background color
-                    child: Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          ThreeDotLoader(
-                            color: AppColors.primaryColor,
-                            size: 12.w,
-                            spacing: 8.w,
-                          ),
-                          16.verticalSpace,
-                          Text(
-                            'Loading PDF...',
-                            style: AppTextStyles.medium.copyWith(
-                              color: Colors.white70,
-                              fontSize: 14.sp,
+                  // Custom Loader
+                  if (_isPdfLoading)
+                    Container(
+                      color: const Color(0xff1B252D), // Match background color
+                      child: Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            ThreeDotLoader(
+                              color: AppColors.primaryColor,
+                              size: 12.w,
+                              spacing: 8.w,
                             ),
-                          ),
-                        ],
+                            16.verticalSpace,
+                            Text(
+                              'Loading PDF...',
+                              style: AppTextStyles.medium.copyWith(
+                                color: Colors.white70,
+                                fontSize: 14.sp,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          // Pagination Controls
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+            decoration: BoxDecoration(
+              color: AppColors.boxClr,
+              border: Border(
+                top: BorderSide(color: Colors.grey[800]!, width: 0.5),
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                // Previous Button
+                GestureDetector(
+                  onTap: () {
+                    if (_currentPage > 1 && _pdfViewerController != null) {
+                      _isNavigatingViaButton =
+                          true; // Mark that navigation is from button
+                      _pdfViewerController!.previousPage();
+                      _saveProgress();
+                    }
+                  },
+                  child: Container(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 16.w,
+                      vertical: 8.h,
+                    ),
+                    decoration: BoxDecoration(
+                      color: _currentPage > 1
+                          ? AppColors.primaryColor
+                          : Colors.grey[800],
+                      borderRadius: BorderRadius.circular(8.r),
+                    ),
+                    child: Text(
+                      'Previous',
+                      style: AppTextStyles.medium.copyWith(
+                        color: _currentPage > 1
+                            ? Colors.black
+                            : Colors.grey[600],
+                        fontSize: 14.sp,
                       ),
                     ),
                   ),
+                ),
+                // Page Info
+                Text(
+                  _totalPages > 0
+                      ? 'Page $_currentPage/$_totalPages'
+                      : 'Loading...',
+                  style: AppTextStyles.medium.copyWith(
+                    color: AppColors.primaryColor,
+                    fontSize: 14.sp,
+                  ),
+                ),
+                // Next Button
+                GestureDetector(
+                  onTap: () {
+                    if (_currentPage < _totalPages &&
+                        _pdfViewerController != null) {
+                      _isNavigatingViaButton =
+                          true; // Mark that navigation is from button
+                      _pdfViewerController!.nextPage();
+                      _saveProgress();
+                    }
+                  },
+                  child: Container(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 16.w,
+                      vertical: 8.h,
+                    ),
+                    decoration: BoxDecoration(
+                      color: _currentPage < _totalPages
+                          ? AppColors.primaryColor
+                          : Colors.grey[800],
+                      borderRadius: BorderRadius.circular(8.r),
+                    ),
+                    child: Text(
+                      'Next',
+                      style: AppTextStyles.medium.copyWith(
+                        color: _currentPage < _totalPages
+                            ? Colors.black
+                            : Colors.grey[600],
+                        fontSize: 14.sp,
+                      ),
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
-        ),
-        // Pagination Controls
-        Container(
-          padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
-          decoration: BoxDecoration(
-            color: AppColors.boxClr,
-            border: Border(
-              top: BorderSide(color: Colors.grey[800]!, width: 0.5),
-            ),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              // Previous Button
-              GestureDetector(
-                onTap: () {
-                  if (_currentPage > 1 && _pdfViewerController != null) {
-                    _isNavigatingViaButton =
-                        true; // Mark that navigation is from button
-                    _pdfViewerController!.previousPage();
-                    _saveProgress();
-                  }
-                },
-                child: Container(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: 16.w,
-                    vertical: 8.h,
-                  ),
-                  decoration: BoxDecoration(
-                    color: _currentPage > 1
-                        ? AppColors.primaryColor
-                        : Colors.grey[800],
-                    borderRadius: BorderRadius.circular(8.r),
-                  ),
-                  child: Text(
-                    'Previous',
-                    style: AppTextStyles.medium.copyWith(
-                      color: _currentPage > 1 ? Colors.black : Colors.grey[600],
-                      fontSize: 14.sp,
-                    ),
-                  ),
-                ),
-              ),
-              // Page Info
-              Text(
-                _totalPages > 0
-                    ? 'Page $_currentPage/$_totalPages'
-                    : 'Loading...',
-                style: AppTextStyles.medium.copyWith(
-                  color: AppColors.primaryColor,
-                  fontSize: 14.sp,
-                ),
-              ),
-              // Next Button
-              GestureDetector(
-                onTap: () {
-                  if (_currentPage < _totalPages &&
-                      _pdfViewerController != null) {
-                    _isNavigatingViaButton =
-                        true; // Mark that navigation is from button
-                    _pdfViewerController!.nextPage();
-                    _saveProgress();
-                  }
-                },
-                child: Container(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: 16.w,
-                    vertical: 8.h,
-                  ),
-                  decoration: BoxDecoration(
-                    color: _currentPage < _totalPages
-                        ? AppColors.primaryColor
-                        : Colors.grey[800],
-                    borderRadius: BorderRadius.circular(8.r),
-                  ),
-                  child: Text(
-                    'Next',
-                    style: AppTextStyles.medium.copyWith(
-                      color: _currentPage < _totalPages
-                          ? Colors.black
-                          : Colors.grey[600],
-                      fontSize: 14.sp,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 

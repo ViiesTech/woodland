@@ -94,6 +94,176 @@ class _AddBookScreenState extends State<AddBookScreen> {
     }
   }
 
+  Future<bool> _isPdfPasswordProtected(File pdfFile) async {
+    try {
+      // Read the PDF file as bytes
+      final bytes = await pdfFile.readAsBytes();
+      final fileSize = bytes.length;
+
+      print('📄 PDF file size: ${fileSize} bytes');
+
+      // For large files, check beginning (first 50KB) and end (last 50KB)
+      // Encryption info is typically in the trailer at the end or in root object
+      final checkSize = fileSize > 100000 ? 50000 : fileSize;
+      final startBytes = bytes.take(checkSize).toList();
+      final endBytes = fileSize > checkSize
+          ? bytes.skip(fileSize - checkSize).take(checkSize).toList()
+          : <int>[];
+
+      // Convert bytes to string for pattern matching
+      // PDF files can have binary content, but encryption markers are in ASCII
+      String pdfContent;
+      String? endContent;
+
+      try {
+        // Check beginning of file
+        pdfContent = String.fromCharCodes(startBytes);
+        // Check end of file (where trailer/encryption info usually is)
+        if (endBytes.isNotEmpty) {
+          endContent = String.fromCharCodes(endBytes);
+        }
+      } catch (e) {
+        // If UTF-8 fails, try Latin-1 which handles binary better
+        pdfContent = String.fromCharCodes(startBytes, 0, startBytes.length);
+        if (endBytes.isNotEmpty) {
+          endContent = String.fromCharCodes(endBytes, 0, endBytes.length);
+        }
+      }
+
+      // Combine content for checking (prioritize end where encryption usually is)
+      final combinedContent = endContent != null
+          ? '$endContent $pdfContent'
+          : pdfContent;
+
+      // Method 1: Check for /Encrypt marker (most reliable - appears in trailer)
+      // This is the standard PDF encryption dictionary marker
+      // Check in both beginning and end content
+      final lowerContent = combinedContent.toLowerCase();
+      if (combinedContent.contains('/Encrypt') ||
+          combinedContent.contains('/Encrypt ') ||
+          lowerContent.contains('/encrypt') ||
+          lowerContent.contains('/encrypt ') ||
+          combinedContent.contains(' /Encrypt') ||
+          combinedContent.contains('\n/Encrypt') ||
+          combinedContent.contains('\r/Encrypt')) {
+        print('🔒 PDF contains /Encrypt marker - password protected');
+        return true;
+      }
+
+      // Method 2: Check for encryption dictionary reference pattern
+      // Pattern: /Encrypt followed by object reference (e.g., "/Encrypt 5 0 R")
+      final encryptRefPattern = RegExp(
+        r'/Encrypt\s+\d+\s+\d+\s+R',
+        caseSensitive: false,
+      );
+      if (encryptRefPattern.hasMatch(combinedContent)) {
+        print(
+          '🔒 PDF contains encryption reference pattern - password protected',
+        );
+        return true;
+      }
+
+      // Method 3: Check for /Encryption marker (alternative)
+      if (combinedContent.contains('/Encryption') ||
+          lowerContent.contains('/encryption')) {
+        print('🔒 PDF contains /Encryption marker - password protected');
+        return true;
+      }
+
+      // Method 4: Check for encryption in trailer section (at the end)
+      // PDF trailers often contain encryption info at the end
+      if (endContent != null) {
+        final trailerStart = endContent.lastIndexOf('trailer');
+        if (trailerStart != -1) {
+          final trailerSection = endContent.substring(trailerStart);
+          if (trailerSection.contains('/Encrypt') ||
+              trailerSection.toLowerCase().contains('/encrypt')) {
+            print('🔒 PDF trailer contains /Encrypt - password protected');
+            return true;
+          }
+        }
+        // Also check the entire end section
+        if (endContent.contains('/Encrypt') ||
+            endContent.toLowerCase().contains('/encrypt')) {
+          print('🔒 PDF end section contains /Encrypt - password protected');
+          return true;
+        }
+      }
+
+      // Method 5: Check for encryption filter patterns
+      // Encrypted PDFs often have /Filter /Standard with /V (version) markers
+      final hasEncryptInFilter =
+          combinedContent.contains('/Filter') &&
+          combinedContent.contains('/Standard') &&
+          (combinedContent.contains('/Encrypt') ||
+              lowerContent.contains('/encrypt'));
+      if (hasEncryptInFilter) {
+        print('🔒 PDF contains encryption filter pattern - password protected');
+        return true;
+      }
+
+      // Method 6: Check binary patterns for encryption in both start and end
+      // Some PDFs might have encryption markers in binary format
+      // Look for the ASCII string "Encrypt" preceded by "/" in the bytes
+      final encryptBytes = [
+        0x45,
+        0x6E,
+        0x63,
+        0x72,
+        0x79,
+        0x70,
+        0x74,
+      ]; // "Encrypt" in ASCII
+      bool foundEncrypt = false;
+
+      // Check in start bytes
+      for (int i = 1; i <= startBytes.length - encryptBytes.length; i++) {
+        bool matches = true;
+        for (int j = 0; j < encryptBytes.length; j++) {
+          if (startBytes[i + j] != encryptBytes[j]) {
+            matches = false;
+            break;
+          }
+        }
+        if (matches && startBytes[i - 1] == 0x2F) {
+          // 0x2F is "/"
+          foundEncrypt = true;
+          break;
+        }
+      }
+
+      // Check in end bytes (where encryption info is more likely)
+      if (!foundEncrypt && endBytes.isNotEmpty) {
+        for (int i = 1; i <= endBytes.length - encryptBytes.length; i++) {
+          bool matches = true;
+          for (int j = 0; j < encryptBytes.length; j++) {
+            if (endBytes[i + j] != encryptBytes[j]) {
+              matches = false;
+              break;
+            }
+          }
+          if (matches && endBytes[i - 1] == 0x2F) {
+            // 0x2F is "/"
+            foundEncrypt = true;
+            break;
+          }
+        }
+      }
+
+      if (foundEncrypt) {
+        print('🔒 PDF contains binary /Encrypt marker - password protected');
+        return true;
+      }
+
+      print('✅ PDF appears to be unprotected');
+      return false; // Not password protected
+    } catch (e) {
+      print('❌ Error checking PDF password protection: $e');
+      // If we can't read or check the file, assume it might be protected to be safe
+      return true;
+    }
+  }
+
   Future<void> _pickPDF() async {
     try {
       FilePickerResult? result = await FilePicker.platform.pickFiles(
@@ -105,8 +275,31 @@ class _AddBookScreenState extends State<AddBookScreen> {
       if (result != null && result.files.isNotEmpty) {
         final file = result.files.first;
         if (file.path != null) {
+          final pdfFile = File(file.path!);
+
+          // Check if PDF is password protected
+          if (mounted) {
+            CustomToast.showInfo(context, 'Checking PDF...');
+          }
+
+          print('🔍 Checking PDF for password protection: ${pdfFile.path}');
+          final isProtected = await _isPdfPasswordProtected(pdfFile);
+          print('🔍 Password protection check result: $isProtected');
+
+          if (isProtected) {
+            print('❌ Password protected PDF rejected');
+            if (mounted) {
+              CustomToast.showError(
+                context,
+                'Password protected PDFs are not allowed. Please use an unprotected PDF file.',
+              );
+            }
+            return; // Exit early - don't set the file
+          }
+
+          print('✅ PDF is not password protected - accepting file');
           setState(() {
-            _pdfFile = File(file.path!);
+            _pdfFile = pdfFile;
             _pdfUrl = null; // Clear URL if file is selected
           });
           if (mounted) {
@@ -177,6 +370,16 @@ class _AddBookScreenState extends State<AddBookScreen> {
         (_chapters[index]['controller'] as TextEditingController).dispose();
       }
       _chapters.removeAt(index);
+
+      // Renumber remaining chapters
+      for (int i = 0; i < _chapters.length; i++) {
+        final controller = _chapters[i]['controller'] as TextEditingController;
+        final currentText = controller.text.trim();
+        // Only update if it follows the "Chapter X" pattern
+        if (currentText.toLowerCase().startsWith('chapter')) {
+          controller.text = 'Chapter ${i + 1}';
+        }
+      }
     });
   }
 

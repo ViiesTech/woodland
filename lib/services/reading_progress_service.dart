@@ -58,16 +58,27 @@ class ReadingProgressService {
       await docRef.set(updateData, SetOptions(merge: true));
       print('📚 ✅ Reading progress document saved for book $bookId, user $userId');
       
-      // Limit to 5 most recent books - delete oldest if we exceed limit
-      await _limitReadingProgress(userId, maxItems: 5);
+      // If book is completed (100%), delete it immediately
+      final progressPercent = (currentPage / totalPages) * 100;
+      if (progressPercent >= 100 && totalPages > 0) {
+        print('📚 ✅ Book $bookId is 100% complete - deleting progress');
+        await docRef.delete();
+        return;
+      }
+      
+      // Keep only the most recent incomplete book - delete all other incomplete books
+      await _keepOnlyMostRecentIncompleteBook(userId, currentBookId: bookId);
     } catch (e) {
       print('❌ Error saving reading progress: $e');
       print('❌ Error stack: ${e.toString()}');
     }
   }
 
-  /// Limit reading progress to maxItems, deleting the oldest ones
-  static Future<void> _limitReadingProgress(String userId, {int maxItems = 5}) async {
+  /// Keep only the most recent incomplete book, delete all other incomplete books
+  static Future<void> _keepOnlyMostRecentIncompleteBook(
+    String userId, {
+    required String currentBookId,
+  }) async {
     try {
       final snapshot = await _firestore
           .collection('users')
@@ -75,29 +86,30 @@ class ReadingProgressService {
           .collection('readingProgress')
           .get();
       
-      if (snapshot.docs.length <= maxItems) {
-        return; // No need to delete anything
+      if (snapshot.docs.isEmpty) {
+        return;
       }
       
-      // Sort by lastUpdated (oldest first)
-      final sortedDocs = snapshot.docs.toList()
-        ..sort((a, b) {
-          final aTime = a.data()['lastUpdated'] as Timestamp?;
-          final bTime = b.data()['lastUpdated'] as Timestamp?;
-          if (aTime == null && bTime == null) return 0;
-          if (aTime == null) return 1;
-          if (bTime == null) return -1;
-          return aTime.compareTo(bTime); // Oldest first
-        });
+      // Filter out completed books (100%) and the current book
+      final otherIncompleteBooks = snapshot.docs.where((doc) {
+        if (doc.id == currentBookId) return false; // Don't delete current book
+        
+        final data = doc.data();
+        final currentPage = data['currentPage'] as int? ?? 1;
+        final totalPages = data['totalPages'] as int? ?? 1;
+        if (totalPages <= 0) return true; // Keep if invalid, but we'll delete it
+        
+        final progressPercent = (currentPage / totalPages) * 100;
+        return progressPercent < 100; // Only delete incomplete books
+      }).toList();
       
-      // Delete oldest items that exceed the limit
-      final itemsToDelete = sortedDocs.length - maxItems;
-      for (int i = 0; i < itemsToDelete; i++) {
-        await sortedDocs[i].reference.delete();
-        print('🗑️ Deleted oldest reading progress: ${sortedDocs[i].id}');
+      // Delete all other incomplete books (keep only the current one)
+      for (var doc in otherIncompleteBooks) {
+        await doc.reference.delete();
+        print('🗑️ Deleted other incomplete book progress: ${doc.id}');
       }
     } catch (e) {
-      print('❌ Error limiting reading progress: $e');
+      print('❌ Error keeping only most recent book: $e');
     }
   }
 
