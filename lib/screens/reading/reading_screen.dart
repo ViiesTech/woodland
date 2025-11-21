@@ -164,11 +164,13 @@ class _ReadingScreenState extends State<ReadingScreen> {
         timeSpentMinutes: timeSpentMinutes,
       );
       print('✅ Reading progress saved successfully');
-      
+
       // Check if book is completed - if so, it will be deleted by the service
       final progressPercent = (validCurrentPage / validTotalPages) * 100;
       if (progressPercent >= 100 && validTotalPages > 0) {
-        print('🎉 Book completed! Progress will be removed from continue reading.');
+        print(
+          '🎉 Book completed! Progress will be removed from continue reading.',
+        );
       }
     } catch (e) {
       print('❌ Error saving reading progress: $e');
@@ -440,94 +442,81 @@ Similique sunt in culpa qui officia deserunt mollitia animi, id est laborum et d
                       color: const Color(
                         0xff1B252D,
                       ), // Dark background container
-                      child: ColorFiltered(
-                        // Invert colors to convert white pages to dark and black text to white
-                        colorFilter: const ColorFilter.matrix([
-                          -1.0, 0.0, 0.0, 0.0, 255.0, // Red channel inverted
-                          0.0, -1.0, 0.0, 0.0, 255.0, // Green channel inverted
-                          0.0, 0.0, -1.0, 0.0, 255.0, // Blue channel inverted
-                          0.0, 0.0, 0.0, 1.0, 0.0, // Alpha channel unchanged
-                        ]),
-                        child: Opacity(
-                          opacity: _isPdfLoading
-                              ? 0
-                              : 1, // Hide PDF while loading
-                          child: SfPdfViewer.network(
-                            maxZoomLevel: 1,
-                            widget.book.pdfUrl!,
-                            controller: _pdfViewerController,
-                            enableDoubleTapZooming: true,
-                            pageLayoutMode: PdfPageLayoutMode
-                                .single, // Show only 1 page at a time
-                            scrollDirection: PdfScrollDirection
-                                .horizontal, // Horizontal for single page mode
-                            canShowScrollHead:
-                                false, // Hide side page numbers/indicators
-                            canShowScrollStatus: false,
+                      child: Opacity(
+                        opacity: _isPdfLoading
+                            ? 0
+                            : 1, // Hide PDF while loading
+                        child: SfPdfViewer.network(
+                          maxZoomLevel: 1,
+                          widget.book.pdfUrl!,
+                          controller: _pdfViewerController,
+                          enableDoubleTapZooming: true,
+                          pageLayoutMode: PdfPageLayoutMode
+                              .single, // Show only 1 page at a time
+                          scrollDirection: PdfScrollDirection
+                              .horizontal, // Horizontal for single page mode
+                          canShowScrollHead:
+                              false, // Hide side page numbers/indicators
+                          canShowScrollStatus: false,
 
-                            onDocumentLoaded: (PdfDocumentLoadedDetails details) {
-                              print('✅ PDF loaded successfully!');
-                              print(
-                                '✅ Total pages: ${details.document.pages.count}',
-                              );
-                              print('✅ PDF URL: ${widget.book.pdfUrl}');
-                              if (mounted) {
-                                setState(() {
-                                  _totalPages = details.document.pages.count;
-                                  _useDemoText = false;
-                                  _isPdfLoading = false; // PDF loaded
-                                });
-                                // Save initial progress with total pages
-                                _saveProgress();
-                              }
-                            },
-                            onDocumentLoadFailed:
-                                (PdfDocumentLoadFailedDetails details) {
-                                  print('❌ PDF load failed!');
-                                  print('❌ Error: ${details.error}');
-                                  print(
-                                    '❌ Error description: ${details.description}',
-                                  );
-                                  print('❌ PDF URL was: ${widget.book.pdfUrl}');
+                          onDocumentLoaded: (PdfDocumentLoadedDetails details) {
+                            print('✅ PDF loaded successfully!');
+                            print(
+                              '✅ Total pages: ${details.document.pages.count}',
+                            );
+                            print('✅ PDF URL: ${widget.book.pdfUrl}');
+                            if (mounted) {
+                              setState(() {
+                                _totalPages = details.document.pages.count;
+                                _useDemoText = false;
+                                _isPdfLoading = false; // PDF loaded
+                              });
+                              // Save initial progress with total pages
+                              _saveProgress();
+                            }
+                          },
+                          onDocumentLoadFailed:
+                              (PdfDocumentLoadFailedDetails details) {
+                                print('❌ PDF load failed!');
+                                print('❌ Error: ${details.error}');
+                                print(
+                                  '❌ Error description: ${details.description}',
+                                );
+                                print('❌ PDF URL was: ${widget.book.pdfUrl}');
 
-                                  // Only show demo text if there's a real error
-                                  if (mounted) {
-                                    setState(() {
-                                      _useDemoText = true;
-                                      _currentPage = 1;
-                                      _totalPages = 2;
-                                      _isPdfLoading = false; // Stop loading
-                                    });
-                                  }
-                                },
-                            onPageChanged: (PdfPageChangedDetails details) {
-                              print(
-                                '📄 Page changed: ${details.newPageNumber}',
-                              );
-                              // Only update page if navigation was via button, otherwise revert
-                              if (mounted) {
-                                if (_isNavigatingViaButton) {
+                                // Only show demo text if there's a real error
+                                if (mounted) {
                                   setState(() {
-                                    _currentPage = details.newPageNumber;
-                                    _isNavigatingViaButton =
-                                        false; // Reset flag
-                                  });
-                                  // Save progress when page changes
-                                  _saveProgress();
-                                } else {
-                                  // Revert to previous page if changed via scroll
-                                  Future.delayed(Duration.zero, () {
-                                    if (_pdfViewerController != null &&
-                                        mounted) {
-                                      _pdfViewerController!.jumpToPage(
-                                        _currentPage,
-                                      );
-                                    }
+                                    _useDemoText = true;
+                                    _currentPage = 1;
+                                    _totalPages = 2;
+                                    _isPdfLoading = false; // Stop loading
                                   });
                                 }
+                              },
+                          onPageChanged: (PdfPageChangedDetails details) {
+                            print('📄 Page changed: ${details.newPageNumber}');
+                            // Only update page if navigation was via button, otherwise revert
+                            if (mounted) {
+                              if (_isNavigatingViaButton) {
+                                setState(() {
+                                  _currentPage = details.newPageNumber;
+                                  _isNavigatingViaButton = false; // Reset flag
+                                });
+                                // Save progress when page changes
+                                _saveProgress();
+                              } else {
+                                // Revert to previous page if changed via scroll
+                                Future.delayed(Duration.zero, () {
+                                  if (_pdfViewerController != null && mounted) {
+                                    _pdfViewerController!.jumpToPage(
+                                      _currentPage,
+                                    );
+                                  }
+                                });
                               }
-                            },
-                          ),
+                            }
+                          },
                         ),
                       ),
                     ),

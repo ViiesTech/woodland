@@ -13,6 +13,7 @@ class AppAssets {
   static const libraryIcon = "assets/icons/libIcon.svg";
   static const messagesIcon = "assets/icons/chatIcon.svg";
   static const gamesIcon = "assets/icons/gamesIcon.svg";
+  static const blogIcon = "assets/icons/blogIcon.svg";
 
   // TEmp Images'
   static const temp1 = "assets/tempImg/temp1.png";

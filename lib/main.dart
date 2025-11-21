@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:device_preview/device_preview.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -9,14 +8,11 @@ import 'package:the_woodlands_series/bloc/auth/auth_bloc.dart';
 import 'package:the_woodlands_series/repositories/auth_repository.dart';
 import 'firebase_options.dart';
 import 'screens/splash_screen.dart';
-import 'admin_panel/admin_access.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  runApp(
-    DevicePreview(enabled: false, builder: (context) => const MyApp()),
-  );
+  runApp(DevicePreview(enabled: false, builder: (context) => const MyApp()));
 }
 
 class MyApp extends StatelessWidget {
@@ -33,7 +29,7 @@ class MyApp extends StatelessWidget {
         splitScreenMode: true,
         builder: (context, child) {
           return MaterialApp(
-            title: 'GlennVerse',
+            title: 'The Woodlands Series',
             debugShowCheckedModeBanner: false,
             useInheritedMediaQuery: true,
             locale: DevicePreview.locale(context),
@@ -69,12 +65,6 @@ class SplashScreenWithAdmin extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        const SplashScreen(),
-        // Admin access button (only in debug mode)
-        if (kDebugMode) AdminAccess.buildAdminButton(context),
-      ],
-    );
+    return const SplashScreen();
   }
 }

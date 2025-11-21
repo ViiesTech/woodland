@@ -22,6 +22,10 @@ import 'package:the_woodlands_series/services/listening_progress_service.dart';
 import 'package:the_woodlands_series/admin_panel/models/book_model.dart';
 import 'package:the_woodlands_series/screens/reading/listen_screen.dart';
 import 'package:the_woodlands_series/screens/book_detail/book_detail_screen.dart';
+import 'package:the_woodlands_series/screens/web_view/web_view_screen.dart';
+import 'package:the_woodlands_series/screens/about_us/about_us_screen.dart';
+import 'package:the_woodlands_series/screens/contact_us/contact_us_screen.dart';
+import 'package:the_woodlands_series/screens/contact_us/admin_contact_list_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -36,6 +40,7 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   UserModel? currentUser;
   String? _currentUserId;
+  bool _isAdmin = false;
   Map<String, Map<String, dynamic>> _viewedBooksProgress = {};
   List<BookModel> _allViewedBooks = []; // All viewed books (both types)
   BookModel? _latestListeningBook; // Latest book with listening progress
@@ -53,6 +58,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       setState(() {
         currentUser = authState.user;
         _currentUserId = authState.user.id;
+        _isAdmin = authState.user.role == 'admin';
       });
       _loadViewedBooks();
       _loadLatestListeningProgress(); // Load saved listening progress
@@ -306,6 +312,136 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               16.horizontalSpace,
                               Text(
                                 'My Bookmarks',
+                                style: AppTextStyles.lufgaLarge.copyWith(
+                                  color: Colors.white,
+                                  fontSize: 16.sp,
+                                ),
+                              ),
+                              Spacer(),
+                              Icon(
+                                Icons.arrow_forward_ios,
+                                color: Colors.white.withOpacity(0.5),
+                                size: 16.sp,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      16.verticalSpace,
+
+                      // About Us Section
+                      GestureDetector(
+                        onTap: () {
+                          AppRouter.routeTo(context, const AboutUsScreen());
+                        },
+                        child: Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 16.w,
+                            vertical: 16.h,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.boxClr,
+                            borderRadius: BorderRadius.circular(12.r),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.info_outline,
+                                color: AppColors.primaryColor,
+                                size: 24.sp,
+                              ),
+                              16.horizontalSpace,
+                              Text(
+                                'About Us',
+                                style: AppTextStyles.lufgaLarge.copyWith(
+                                  color: Colors.white,
+                                  fontSize: 16.sp,
+                                ),
+                              ),
+                              Spacer(),
+                              Icon(
+                                Icons.arrow_forward_ios,
+                                color: Colors.white.withOpacity(0.5),
+                                size: 16.sp,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      16.verticalSpace,
+
+                      // Articles Section
+                      GestureDetector(
+                        onTap: _showArticlesBottomSheet,
+                        child: Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 16.w,
+                            vertical: 16.h,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.boxClr,
+                            borderRadius: BorderRadius.circular(12.r),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.article,
+                                color: AppColors.primaryColor,
+                                size: 24.sp,
+                              ),
+                              16.horizontalSpace,
+                              Text(
+                                'Articles',
+                                style: AppTextStyles.lufgaLarge.copyWith(
+                                  color: Colors.white,
+                                  fontSize: 16.sp,
+                                ),
+                              ),
+                              Spacer(),
+                              Icon(
+                                Icons.arrow_forward_ios,
+                                color: Colors.white.withOpacity(0.5),
+                                size: 16.sp,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      16.verticalSpace,
+
+                      // Contact Us / View Contacts Section (conditional based on admin)
+                      GestureDetector(
+                        onTap: () {
+                          if (_isAdmin) {
+                            AppRouter.routeTo(
+                              context,
+                              const AdminContactListScreen(),
+                            );
+                          } else {
+                            AppRouter.routeTo(context, const ContactUsScreen());
+                          }
+                        },
+                        child: Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 16.w,
+                            vertical: 16.h,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.boxClr,
+                            borderRadius: BorderRadius.circular(12.r),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                _isAdmin ? Icons.message : Icons.contact_mail,
+                                color: AppColors.primaryColor,
+                                size: 24.sp,
+                              ),
+                              16.horizontalSpace,
+                              Text(
+                                _isAdmin
+                                    ? 'View Contact Messages'
+                                    : 'Contact Us',
                                 style: AppTextStyles.lufgaLarge.copyWith(
                                   color: Colors.white,
                                   fontSize: 16.sp,
@@ -967,6 +1103,142 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  void _showArticlesBottomSheet() {
+    final articles = [
+      {
+        'name': 'Tumblr',
+        'url':
+            'https://www.tumblr.com/boundlessbookpublishers/793058895733129216/embark-on-a-thrilling-journey-of-survival-and?source=share',
+      },
+      {
+        'name': 'Differ Blog',
+        'url':
+            'https://differ.blog/p/embark-on-a-thrilling-journey-of-survival-and-unity-in-nature-e2dfa3',
+      },
+      {
+        'name': 'Boundless Substack',
+        'url':
+            'https://boundlesspublishers.substack.com/p/embark-on-a-thrilling-journey-of',
+      },
+      {
+        'name': 'Blogspot',
+        'url':
+            'https://boundlessauthors.blogspot.com/2025/08/embark-on-thrilling-journey-of-survival.html',
+      },
+      {
+        'name': 'Medium',
+        'url':
+            'https://medium.com/@harris.harrison/embark-on-a-thrilling-journey-of-survival-and-unity-in-nature-dg-videttos-unveils-the-impervious-f057c28cda09',
+      },
+    ];
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (BuildContext context) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.6,
+          minChildSize: 0.4,
+          maxChildSize: 0.9,
+          builder: (context, scrollController) {
+            return Container(
+              decoration: BoxDecoration(
+                color: AppColors.boxClr,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(20.r)),
+              ),
+              child: Column(
+                children: [
+                  // Handle bar
+                  Padding(
+                    padding: EdgeInsets.only(top: 12.h),
+                    child: Container(
+                      width: 40.w,
+                      height: 4.h,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.3),
+                        borderRadius: BorderRadius.circular(2.r),
+                      ),
+                    ),
+                  ),
+                  // Title
+                  Padding(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 20.w,
+                      vertical: 20.h,
+                    ),
+                    child: Text(
+                      'Articles',
+                      style: AppTextStyles.lufgaLarge.copyWith(
+                        color: Colors.white,
+                        fontSize: 20.sp,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  // Scrollable article list
+                  Expanded(
+                    child: ListView.builder(
+                      controller: scrollController,
+                      padding: EdgeInsets.symmetric(horizontal: 20.w),
+                      itemCount: articles.length,
+                      itemBuilder: (context, index) {
+                        final article = articles[index];
+                        return GestureDetector(
+                          onTap: () {
+                            Navigator.pop(context);
+                            AppRouter.routeTo(
+                              context,
+                              WebViewScreen(
+                                url: article['url']!,
+                                title: article['name']!,
+                              ),
+                            );
+                          },
+                          child: Container(
+                            margin: EdgeInsets.only(bottom: 12.h),
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 16.w,
+                              vertical: 16.h,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.bgClr,
+                              borderRadius: BorderRadius.circular(12.r),
+                            ),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    article['name']!,
+                                    style: AppTextStyles.lufgaLarge.copyWith(
+                                      color: Colors.white,
+                                      fontSize: 16.sp,
+                                    ),
+                                  ),
+                                ),
+                                Icon(
+                                  Icons.arrow_forward_ios,
+                                  color: Colors.white.withOpacity(0.5),
+                                  size: 16.sp,
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  // Bottom padding
+                  SizedBox(height: 20.h),
+                ],
+              ),
+            );
+          },
+        );
+      },
     );
   }
 }

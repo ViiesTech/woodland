@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:flutter_svg/flutter_svg.dart';
-import 'package:the_woodlands_series/components/resource/app_assets.dart';
-import 'package:the_woodlands_series/components/resource/app_routers.dart';
-import 'package:the_woodlands_series/screens/login_screen/login_screen.dart';
-import 'package:the_woodlands_series/screens/dashboard_screen/dashboard_screen.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:the_woodlands_series/bloc/auth/auth_bloc.dart';
 import 'package:the_woodlands_series/bloc/auth/auth_event.dart';
 import 'package:the_woodlands_series/bloc/auth/auth_state.dart';
+import 'package:the_woodlands_series/components/resource/app_assets.dart';
+import 'package:the_woodlands_series/components/resource/app_colors.dart';
+import 'package:the_woodlands_series/components/resource/app_routers.dart';
+import 'package:the_woodlands_series/screens/dashboard_screen/dashboard_screen.dart';
+import 'package:the_woodlands_series/screens/login_screen/login_screen.dart';
+
 import '../components/resource/size_constants.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -59,19 +60,31 @@ class _SplashScreenState extends State<SplashScreen>
     return BlocListener<AuthBloc, AuthState>(
       listener: (context, state) {
         if (state is Authenticated) {
-          // User is logged in, navigate to dashboard
+          // User is logged in, navigate to dashboard after delay
           // DashboardScreen will automatically show AdminHomeScreen for admins
-          AppRouter.clearStack(context, const DashboardScreen());
+          Future.delayed(const Duration(seconds: 2), () {
+            if (mounted) {
+              AppRouter.clearStack(context, const DashboardScreen());
+            }
+          });
         } else if (state is Unauthenticated) {
-          // User is not logged in, navigate to login screen
-          AppRouter.clearStack(context, const LoginScreen());
+          // User is not logged in, navigate to login screen after delay
+          Future.delayed(const Duration(seconds: 2), () {
+            if (mounted) {
+              AppRouter.clearStack(context, const LoginScreen());
+            }
+          });
         } else if (state is AuthError) {
-          // Error occurred, navigate to login screen
-          AppRouter.clearStack(context, const LoginScreen());
+          // Error occurred, navigate to login screen after delay
+          Future.delayed(const Duration(seconds: 2), () {
+            if (mounted) {
+              AppRouter.clearStack(context, const LoginScreen());
+            }
+          });
         }
       },
       child: Scaffold(
-        backgroundColor: Colors.black,
+        backgroundColor: AppColors.bgClr,
         body: Center(
           child: AnimatedBuilder(
             animation: _animationController,
@@ -84,62 +97,13 @@ class _SplashScreenState extends State<SplashScreen>
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       // App Logo
-                      Container(
-                        width: SizeCons.getResponsiveWidth(120),
-                        height: SizeCons.getResponsiveHeight(120),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(
-                            SizeCons.getResponsiveRadius(20),
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.green.withOpacity(0.4),
-                              blurRadius: 20.r,
-                              offset: Offset(0, 8.h),
-                              spreadRadius: 0,
-                            ),
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.2),
-                              blurRadius: 10.r,
-                              offset: Offset(0, 4.h),
-                              spreadRadius: 0,
-                            ),
-                          ],
-                        ),
-                        child: Image.asset(
-                          AppAssets.logo,
-                          width: SizeCons.getResponsiveWidth(120),
-                          height: SizeCons.getResponsiveHeight(120),
-                          fit: BoxFit.contain,
-                        ),
+                      Image.asset(
+                        AppAssets.logo,
+                        width: SizeCons.getResponsiveWidth(220),
+                        height: SizeCons.getResponsiveHeight(220),
+                        fit: BoxFit.contain,
                       ),
-                      SizedBox(height: SizeCons.getResponsiveHeight(30)),
-                      // App Title
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 20),
-                        child: Text(
-                          'GlennVerse',
-                          style: TextStyle(
-                            fontFamily: 'cursive',
-                            fontSize: SizeCons.getResponsiveFontSize(28),
-                            fontWeight: FontWeight.w400,
-                            color: Colors.white,
-                            letterSpacing: 1.2,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                      SizedBox(height: SizeCons.getResponsiveHeight(10)),
-                      // Subtitle
-                      Text(
-                        'Your Gateway to Adventure',
-                        style: TextStyle(
-                          fontSize: SizeCons.getResponsiveFontSize(16),
-                          color: Colors.grey[400],
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                      SizedBox(height: SizeCons.getResponsiveHeight(50)),
+                      10.verticalSpace,
                       // Loading indicator
                       SizedBox(
                         width: SizeCons.getResponsiveWidth(30),
@@ -147,7 +111,7 @@ class _SplashScreenState extends State<SplashScreen>
                         child: const CircularProgressIndicator(
                           strokeWidth: 2,
                           valueColor: AlwaysStoppedAnimation<Color>(
-                            Colors.green,
+                            Colors.white,
                           ),
                         ),
                       ),
