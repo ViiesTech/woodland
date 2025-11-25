@@ -510,11 +510,13 @@ class _ChatScreenState extends State<ChatScreen> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Text(
-                      'Do you want to chat with ${widget.user.name}?',
-                      style: AppTextStyles.regular.copyWith(
-                        color: Colors.white.withOpacity(0.8),
-                        fontSize: 14.sp,
+                    Expanded(
+                      child: Text(
+                        'Do you want to chat with ${widget.user.name}?',
+                        style: AppTextStyles.regular.copyWith(
+                          color: Colors.white.withOpacity(0.8),
+                          fontSize: 14.sp,
+                        ),
                       ),
                     ),
                     16.horizontalSpace,

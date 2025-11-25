@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:the_woodlands_series/components/card/global_card.dart';
 import 'package:the_woodlands_series/components/resource/app_colors.dart';
 import 'package:the_woodlands_series/components/resource/app_textstyle.dart';
@@ -366,14 +367,51 @@ class _AudiobookPageState extends State<AudiobookPage>
                       width: 80.w,
                       height: 80.h,
                       decoration: BoxDecoration(
-                        image: DecorationImage(
-                          image: book.coverImageUrl.startsWith('http')
-                              ? NetworkImage(book.coverImageUrl)
-                                    as ImageProvider
-                              : AssetImage(book.coverImageUrl),
-                          fit: BoxFit.cover,
-                        ),
                         borderRadius: BorderRadius.circular(8.r),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(8.r),
+                        child: book.coverImageUrl.startsWith('http')
+                            ? CachedNetworkImage(
+                                imageUrl: book.coverImageUrl,
+                                width: 80.w,
+                                height: 80.h,
+                                fit: BoxFit.cover,
+                                progressIndicatorBuilder: (context, url, progress) => Container(
+                                  width: 80.w,
+                                  height: 80.h,
+                                  color: Colors.grey[800],
+                                  child: Center(
+                                    child: CircularProgressIndicator(
+                                      value: progress.progress,
+                                      color: AppColors.primaryColor,
+                                      strokeWidth: 2,
+                                    ),
+                                  ),
+                                ),
+                                errorWidget: (context, url, error) {
+                                  return Container(
+                                    width: 80.w,
+                                    height: 80.h,
+                                    color: Colors.grey[800],
+                                    child: Icon(
+                                      Icons.image_not_supported,
+                                      color: Colors.grey[600],
+                                      size: 24.sp,
+                                    ),
+                                  );
+                                },
+                                fadeInDuration: Duration(milliseconds: 300),
+                                fadeOutDuration: Duration(milliseconds: 100),
+                                memCacheWidth: 160, // 80.w * 2 for better quality
+                                memCacheHeight: 160, // 80.h * 2 for better quality
+                              )
+                            : Image.asset(
+                                book.coverImageUrl,
+                                width: 80.w,
+                                height: 80.h,
+                                fit: BoxFit.cover,
+                              ),
                       ),
                     ),
                     if (hasProgress)

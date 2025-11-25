@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:the_woodlands_series/components/resource/app_assets.dart';
 import 'package:the_woodlands_series/components/resource/app_textstyle.dart';
 import 'package:the_woodlands_series/components/resource/app_colors.dart';
@@ -85,7 +86,6 @@ class _GlobalCardState extends State<GlobalCard> {
                     Container(
                       height: 119.h,
                       width: double.infinity,
-
                       decoration: BoxDecoration(
                         border: Border.all(
                           color: const Color.fromARGB(31, 141, 141, 141),
@@ -95,11 +95,31 @@ class _GlobalCardState extends State<GlobalCard> {
                       child: widget.imageAsset.startsWith('http')
                           ? ClipRRect(
                               borderRadius: BorderRadius.circular(14.r),
-                              child: Image.network(
-                                widget.imageAsset,
+                              child: CachedNetworkImage(
+                                imageUrl: widget.imageAsset,
+                                width: double.infinity,
+                                height: 119.h,
                                 fit: BoxFit.contain,
-                                errorBuilder: (context, error, stackTrace) {
+                                progressIndicatorBuilder:
+                                    (context, url, progress) => Container(
+                                      width: double.infinity,
+                                      height: 119.h,
+                                      color: Colors.grey[800],
+                                      child: Center(
+                                        child: CircularProgressIndicator(
+                                          value: progress.progress,
+                                          color: Colors.orange,
+                                          strokeWidth: 2,
+                                        ),
+                                      ),
+                                    ),
+                                errorWidget: (context, url, error) {
+                                  print(
+                                    'Error loading image: $url, Error: $error',
+                                  );
                                   return Container(
+                                    width: double.infinity,
+                                    height: 119.h,
                                     color: Colors.grey[800],
                                     child: Icon(
                                       Icons.image_not_supported,
@@ -108,27 +128,12 @@ class _GlobalCardState extends State<GlobalCard> {
                                     ),
                                   );
                                 },
-                                loadingBuilder:
-                                    (context, child, loadingProgress) {
-                                      if (loadingProgress == null) return child;
-                                      return Container(
-                                        color: Colors.grey[800],
-                                        child: Center(
-                                          child: CircularProgressIndicator(
-                                            value:
-                                                loadingProgress
-                                                        .expectedTotalBytes !=
-                                                    null
-                                                ? loadingProgress
-                                                          .cumulativeBytesLoaded /
-                                                      loadingProgress
-                                                          .expectedTotalBytes!
-                                                : null,
-                                            color: Colors.orange,
-                                          ),
-                                        ),
-                                      );
-                                    },
+                                fadeInDuration: Duration(milliseconds: 300),
+                                fadeOutDuration: Duration(milliseconds: 100),
+                                memCacheWidth:
+                                    244, // 122.w * 2 for better quality
+                                memCacheHeight:
+                                    238, // 119.h * 2 for better quality
                               ),
                             )
                           : null,

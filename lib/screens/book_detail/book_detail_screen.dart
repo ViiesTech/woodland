@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:the_woodlands_series/Components/resource/app_routers.dart';
 import 'package:the_woodlands_series/components/resource/size_constants.dart';
 import 'package:the_woodlands_series/admin_panel/models/book_model.dart';
@@ -186,27 +187,54 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
                   Container(
                     height: 432.h,
                     width: double.infinity,
-                    decoration: BoxDecoration(
-                      color: AppColors.boxClr,
-                      image: _book.coverImageUrl.isNotEmpty
-                          ? DecorationImage(
-                              image: _book.coverImageUrl.startsWith('http')
-                                  ? NetworkImage(_book.coverImageUrl)
-                                        as ImageProvider
-                                  : AssetImage(_book.coverImageUrl),
-                              fit: BoxFit.cover,
-                              onError: (exception, stackTrace) {
-                                // Handle error silently
-                              },
-                            )
-                          : null,
-                    ),
-                    child: BackdropFilter(
-                      filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-                      child: Container(
-                        color: Colors.black.withValues(alpha: 0.3),
-                      ),
-                    ),
+                    color: AppColors.boxClr,
+                    child: _book.coverImageUrl.isNotEmpty
+                        ? Stack(
+                            fit: StackFit.expand,
+                            children: [
+                              _book.coverImageUrl.startsWith('http')
+                                  ? CachedNetworkImage(
+                                      imageUrl: _book.coverImageUrl,
+                                      width: double.infinity,
+                                      height: 432.h,
+                                      fit: BoxFit.cover,
+                                      errorWidget: (context, url, error) {
+                                        return Container(
+                                          color: AppColors.boxClr,
+                                        );
+                                      },
+                                      memCacheWidth: 800,
+                                      memCacheHeight: 864,
+                                    )
+                                  : Image.asset(
+                                      _book.coverImageUrl,
+                                      width: double.infinity,
+                                      height: 432.h,
+                                      fit: BoxFit.cover,
+                                      errorBuilder:
+                                          (context, error, stackTrace) {
+                                            return Container(
+                                              color: AppColors.boxClr,
+                                            );
+                                          },
+                                    ),
+                              BackdropFilter(
+                                filter: ImageFilter.blur(
+                                  sigmaX: 20,
+                                  sigmaY: 20,
+                                ),
+                                child: Container(
+                                  color: Colors.black.withValues(alpha: 0.3),
+                                ),
+                              ),
+                            ],
+                          )
+                        : BackdropFilter(
+                            filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                            child: Container(
+                              color: Colors.black.withValues(alpha: 0.3),
+                            ),
+                          ),
                   ),
                   Padding(
                     padding: EdgeInsets.symmetric(
@@ -493,40 +521,110 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
                                                           CrossAxisAlignment
                                                               .start,
                                                       children: [
-                                                        Container(
-                                                          height: 120.h,
-                                                          decoration: BoxDecoration(
-                                                            image: DecorationImage(
-                                                              image:
-                                                                  book
-                                                                      .coverImageUrl
-                                                                      .isNotEmpty
-                                                                  ? (book.coverImageUrl.startsWith(
-                                                                          'http',
+                                                        ClipRRect(
+                                                          borderRadius:
+                                                              BorderRadius.circular(
+                                                                8.r,
+                                                              ),
+                                                          child: Container(
+                                                            height: 120.h,
+                                                            width:
+                                                                double.infinity,
+                                                            child:
+                                                                book
+                                                                    .coverImageUrl
+                                                                    .isNotEmpty
+                                                                ? (book.coverImageUrl
+                                                                          .startsWith(
+                                                                            'http',
+                                                                          )
+                                                                      ? CachedNetworkImage(
+                                                                          imageUrl:
+                                                                              book.coverImageUrl,
+                                                                          width:
+                                                                              double.infinity,
+                                                                          height:
+                                                                              120.h,
+                                                                          fit: BoxFit
+                                                                              .cover,
+                                                                          progressIndicatorBuilder:
+                                                                              (
+                                                                                context,
+                                                                                url,
+                                                                                progress,
+                                                                              ) => Container(
+                                                                                width: double.infinity,
+                                                                                height: 120.h,
+                                                                                color: Colors.grey[800],
+                                                                                child: Center(
+                                                                                  child: CircularProgressIndicator(
+                                                                                    value: progress.progress,
+                                                                                    color: AppColors.primaryColor,
+                                                                                    strokeWidth: 2,
+                                                                                  ),
+                                                                                ),
+                                                                              ),
+                                                                          errorWidget:
+                                                                              (
+                                                                                context,
+                                                                                url,
+                                                                                error,
+                                                                              ) {
+                                                                                return Container(
+                                                                                  width: double.infinity,
+                                                                                  height: 120.h,
+                                                                                  color: Colors.grey[800],
+                                                                                  child: Icon(
+                                                                                    Icons.image_not_supported,
+                                                                                    color: Colors.grey[600],
+                                                                                    size: 30.sp,
+                                                                                  ),
+                                                                                );
+                                                                              },
+                                                                          fadeInDuration: Duration(
+                                                                            milliseconds:
+                                                                                300,
+                                                                          ),
+                                                                          memCacheWidth:
+                                                                              280,
+                                                                          memCacheHeight:
+                                                                              240,
                                                                         )
-                                                                        ? NetworkImage(
-                                                                                book.coverImageUrl,
-                                                                              )
-                                                                              as ImageProvider
-                                                                        : AssetImage(
-                                                                            book.coverImageUrl,
-                                                                          ))
-                                                                  : AssetImage(
-                                                                      'assets/tempImg/temp1.png',
-                                                                    ),
-                                                              fit: BoxFit.cover,
-                                                              onError:
-                                                                  (
-                                                                    exception,
-                                                                    stackTrace,
-                                                                  ) {
-                                                                    // Handle error silently
-                                                                  },
-                                                            ),
-                                                            borderRadius:
-                                                                BorderRadius.circular(
-                                                                  8.r,
-                                                                ),
+                                                                      : Image.asset(
+                                                                          book.coverImageUrl,
+                                                                          width:
+                                                                              double.infinity,
+                                                                          height:
+                                                                              120.h,
+                                                                          fit: BoxFit
+                                                                              .cover,
+                                                                          errorBuilder:
+                                                                              (
+                                                                                context,
+                                                                                error,
+                                                                                stackTrace,
+                                                                              ) {
+                                                                                return Container(
+                                                                                  width: double.infinity,
+                                                                                  height: 120.h,
+                                                                                  color: Colors.grey[800],
+                                                                                  child: Icon(
+                                                                                    Icons.image_not_supported,
+                                                                                    color: Colors.grey[600],
+                                                                                    size: 30.sp,
+                                                                                  ),
+                                                                                );
+                                                                              },
+                                                                        ))
+                                                                : Image.asset(
+                                                                    'assets/tempImg/temp1.png',
+                                                                    width: double
+                                                                        .infinity,
+                                                                    height:
+                                                                        120.h,
+                                                                    fit: BoxFit
+                                                                        .cover,
+                                                                  ),
                                                           ),
                                                         ),
                                                         8.verticalSpace,
@@ -680,18 +778,64 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
                     alignment: Alignment.topCenter,
                     child: Padding(
                       padding: EdgeInsets.only(top: 120.h),
-                      child: Container(
-                        height: 159.h,
-                        width: 159.w,
-                        decoration: BoxDecoration(
-                          image: DecorationImage(
-                            image: _book.coverImageUrl.startsWith('http')
-                                ? NetworkImage(_book.coverImageUrl)
-                                      as ImageProvider
-                                : AssetImage(_book.coverImageUrl),
-                            fit: BoxFit.fill,
-                          ),
-                          borderRadius: BorderRadius.circular(12.r),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(12.r),
+                        child: Container(
+                          height: 159.h,
+                          width: 159.w,
+                          child: _book.coverImageUrl.startsWith('http')
+                              ? CachedNetworkImage(
+                                  imageUrl: _book.coverImageUrl,
+                                  width: 159.w,
+                                  height: 159.h,
+                                  fit: BoxFit.contain,
+                                  progressIndicatorBuilder:
+                                      (context, url, progress) => Container(
+                                        width: 159.w,
+                                        height: 159.h,
+                                        color: Colors.grey[800],
+                                        child: Center(
+                                          child: CircularProgressIndicator(
+                                            value: progress.progress,
+                                            color: AppColors.primaryColor,
+                                            strokeWidth: 2,
+                                          ),
+                                        ),
+                                      ),
+                                  errorWidget: (context, url, error) {
+                                    return Container(
+                                      width: 159.w,
+                                      height: 159.h,
+                                      color: Colors.grey[800],
+                                      child: Icon(
+                                        Icons.image_not_supported,
+                                        color: Colors.grey[600],
+                                        size: 40.sp,
+                                      ),
+                                    );
+                                  },
+                                  fadeInDuration: Duration(milliseconds: 300),
+                                  memCacheWidth: 318,
+                                  memCacheHeight: 318,
+                                )
+                              : Image.asset(
+                                  _book.coverImageUrl,
+                                  width: 159.w,
+                                  height: 159.h,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) {
+                                    return Container(
+                                      width: 159.w,
+                                      height: 159.h,
+                                      color: Colors.grey[800],
+                                      child: Icon(
+                                        Icons.image_not_supported,
+                                        color: Colors.grey[600],
+                                        size: 40.sp,
+                                      ),
+                                    );
+                                  },
+                                ),
                         ),
                       ),
                     ),

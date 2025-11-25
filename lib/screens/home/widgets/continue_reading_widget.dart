@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:the_woodlands_series/components/button/primary_button.dart';
 import 'package:the_woodlands_series/components/resource/app_colors.dart';
 import 'package:the_woodlands_series/components/resource/app_textstyle.dart';
@@ -155,19 +156,58 @@ class _BookDisplayWidgetState extends State<_BookDisplayWidget> {
                 Container(
                   width: 128.w,
                   height: 146.h,
-                  decoration: BoxDecoration(
-                    image: DecorationImage(
-                      image: book.coverImageUrl.startsWith('http')
-                          ? NetworkImage(book.coverImageUrl) as ImageProvider
-                          : AssetImage(book.coverImageUrl),
-                      fit: BoxFit.cover,
-                    ),
-                  ),
+                  child: book.coverImageUrl.startsWith('http')
+                      ? CachedNetworkImage(
+                          imageUrl: book.coverImageUrl,
+                          width: 128.w,
+                          height: 146.h,
+                          fit: BoxFit.cover,
+                          progressIndicatorBuilder: (context, url, progress) =>
+                              Container(
+                                width: 128.w,
+                                height: 146.h,
+                                color: Colors.grey[800],
+                                child: Center(
+                                  child: CircularProgressIndicator(
+                                    value: progress.progress,
+                                    color: AppColors.primaryColor,
+                                    strokeWidth: 2,
+                                  ),
+                                ),
+                              ),
+                          errorWidget: (context, url, error) {
+                            return Container(
+                              width: 128.w,
+                              height: 146.h,
+                              color: Colors.grey[800],
+                              child: Icon(
+                                Icons.image_not_supported,
+                                color: Colors.grey[600],
+                                size: 40.sp,
+                              ),
+                            );
+                          },
+                          fadeInDuration: Duration(milliseconds: 300),
+                          fadeOutDuration: Duration(milliseconds: 100),
+                          memCacheWidth: 256, // 128.w * 2 for better quality
+                          memCacheHeight: 292, // 146.h * 2 for better quality
+                        )
+                      : Image.asset(
+                          book.coverImageUrl,
+                          width: 128.w,
+                          height: 146.h,
+                          fit: BoxFit.cover,
+                        ),
                 ),
                 Expanded(
                   child: Padding(
-                    padding: EdgeInsets.symmetric(vertical: 10.h),
+                    padding: EdgeInsets.only(
+                      left: 10.w ,
+                      top: 10.h,
+                      bottom: 10.h,
+                    ),
                     child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Column(
