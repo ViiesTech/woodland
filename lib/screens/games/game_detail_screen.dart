@@ -2,15 +2,18 @@ import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:the_woodlands_series/components/button/primary_button.dart';
-import 'package:the_woodlands_series/components/resource/app_assets.dart';
 import 'package:the_woodlands_series/components/resource/app_colors.dart';
 import 'package:the_woodlands_series/components/resource/app_textstyle.dart';
 import 'package:the_woodlands_series/components/resource/app_routers.dart';
 import 'package:the_woodlands_series/components/card/global_card.dart';
 import 'package:the_woodlands_series/models/game_model.dart';
 import 'package:the_woodlands_series/services/game_service.dart';
+import 'package:the_woodlands_series/bloc/auth/auth_bloc.dart';
+import 'package:the_woodlands_series/bloc/auth/auth_state.dart';
 import 'play_game_screen.dart';
+import 'edit_game_screen.dart';
 
 class GameDetailScreen extends StatefulWidget {
   final GameModel game;
@@ -24,10 +27,12 @@ class GameDetailScreen extends StatefulWidget {
 class _GameDetailScreenState extends State<GameDetailScreen> {
   List<GameModel> similarGames = [];
   StreamSubscription<List<GameModel>>? _gamesSubscription;
+  GameModel? _currentGame;
 
   @override
   void initState() {
     super.initState();
+    _currentGame = widget.game;
     _loadSimilarGames();
   }
 
@@ -36,21 +41,23 @@ class _GameDetailScreenState extends State<GameDetailScreen> {
     _gamesSubscription = GameService.getAllGames().listen((games) {
       if (mounted) {
         setState(() {
+          final currentGame = _currentGame ?? widget.game;
           similarGames = games
               .where(
                 (game) =>
-                    game.id != widget.game.id &&
-                    game.category == widget.game.category,
+                    game.id != currentGame.id &&
+                    game.category == currentGame.category,
               )
               .take(6)
               .toList();
 
           // If not enough games in same category, fill with other games
           if (similarGames.length < 6) {
+            final currentGame = _currentGame ?? widget.game;
             final otherGames = games
                 .where(
                   (game) =>
-                      game.id != widget.game.id &&
+                      game.id != currentGame.id &&
                       !similarGames.any((g) => g.id == game.id),
                 )
                 .take(6 - similarGames.length)
@@ -87,6 +94,34 @@ class _GameDetailScreenState extends State<GameDetailScreen> {
             fontSize: 20.sp,
           ),
         ),
+        actions: [
+          BlocBuilder<AuthBloc, AuthState>(
+            builder: (context, state) {
+              final isAdmin =
+                  state is Authenticated && state.user.role == 'admin';
+              if (!isAdmin) return SizedBox.shrink();
+
+              return IconButton(
+                onPressed: () async {
+                  final updatedGame = await Navigator.push<GameModel>(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) =>
+                          EditGameScreen(game: _currentGame ?? widget.game),
+                    ),
+                  );
+
+                  if (updatedGame != null) {
+                    setState(() {
+                      _currentGame = updatedGame;
+                    });
+                  }
+                },
+                icon: Icon(Icons.edit, color: Colors.white),
+              );
+            },
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         child: Column(
@@ -100,9 +135,16 @@ class _GameDetailScreenState extends State<GameDetailScreen> {
                     child: Container(
                       decoration: BoxDecoration(
                         image: DecorationImage(
-                          image: widget.game.imageUrl.startsWith('http')
-                              ? NetworkImage(widget.game.imageUrl)
-                              : AssetImage(widget.game.imageUrl)
+                          image:
+                              (_currentGame ?? widget.game).imageUrl.startsWith(
+                                'http',
+                              )
+                              ? NetworkImage(
+                                  (_currentGame ?? widget.game).imageUrl,
+                                )
+                              : AssetImage(
+                                      (_currentGame ?? widget.game).imageUrl,
+                                    )
                                     as ImageProvider,
                           fit: BoxFit.cover,
                           onError: (exception, stackTrace) {
@@ -153,10 +195,12 @@ class _GameDetailScreenState extends State<GameDetailScreen> {
                           ),
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(20.r),
-                            child: widget.game.imageUrl.startsWith('http')
+                            child:
+                                (_currentGame ?? widget.game).imageUrl
+                                    .startsWith('http')
                                 ? Image.network(
-                                    widget.game.imageUrl,
-                                    fit: BoxFit.cover,
+                                    (_currentGame ?? widget.game).imageUrl,
+                                    fit: BoxFit.fill,
                                     errorBuilder: (context, error, stackTrace) {
                                       return Container(
                                         color: Colors.grey[800],
@@ -189,7 +233,7 @@ class _GameDetailScreenState extends State<GameDetailScreen> {
                                     },
                                   )
                                 : Image.asset(
-                                    widget.game.imageUrl,
+                                    (_currentGame ?? widget.game).imageUrl,
                                     fit: BoxFit.cover,
                                   ),
                           ),
@@ -201,7 +245,7 @@ class _GameDetailScreenState extends State<GameDetailScreen> {
                         SizedBox(
                           width: 350.w,
                           child: Text(
-                            widget.game.title,
+                            (_currentGame ?? widget.game).title,
                             style: AppTextStyles.lufgaLarge.copyWith(
                               color: Colors.white,
                               fontSize: 20.sp,
@@ -214,12 +258,14 @@ class _GameDetailScreenState extends State<GameDetailScreen> {
                         ),
 
                         // Game subtitle
-                        if (widget.game.subtitle.isNotEmpty) ...[
+                        if ((_currentGame ?? widget.game)
+                            .subtitle
+                            .isNotEmpty) ...[
                           8.verticalSpace,
                           SizedBox(
                             width: 350.w,
                             child: Text(
-                              widget.game.subtitle,
+                              (_currentGame ?? widget.game).subtitle,
                               style: AppTextStyles.medium.copyWith(
                                 color: Colors.white.withOpacity(0.8),
                                 fontSize: 14.sp,
@@ -237,12 +283,13 @@ class _GameDetailScreenState extends State<GameDetailScreen> {
                           buttonWidth: 250.w,
                           title: 'Play Game',
                           onTap: () {
-                            if (widget.game.gameUrl.isNotEmpty) {
+                            final game = _currentGame ?? widget.game;
+                            if (game.gameUrl.isNotEmpty) {
                               AppRouter.routeTo(
                                 context,
                                 PlayGameScreen(
-                                  gameUrl: widget.game.gameUrl,
-                                  gameTitle: widget.game.title,
+                                  gameUrl: game.gameUrl,
+                                  gameTitle: game.title,
                                 ),
                               );
                             } else {
@@ -274,16 +321,25 @@ class _GameDetailScreenState extends State<GameDetailScreen> {
                     40.verticalSpace,
 
                     // Category
-                    if (widget.game.category.isNotEmpty)
-                      Text(
-                        widget.game.category,
-                        style: AppTextStyles.medium.copyWith(
-                          color: AppColors.primaryColor,
-                          fontSize: 14.sp,
-                        ),
-                      ),
-
-                    if (widget.game.category.isNotEmpty) 8.verticalSpace,
+                    Builder(
+                      builder: (context) {
+                        final game = _currentGame ?? widget.game;
+                        if (game.category.isEmpty) return SizedBox.shrink();
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              game.category,
+                              style: AppTextStyles.medium.copyWith(
+                                color: AppColors.primaryColor,
+                                fontSize: 14.sp,
+                              ),
+                            ),
+                            8.verticalSpace,
+                          ],
+                        );
+                      },
+                    ),
 
                     // About this Game
                     Text(
@@ -298,15 +354,20 @@ class _GameDetailScreenState extends State<GameDetailScreen> {
                     16.verticalSpace,
 
                     // Description
-                    Text(
-                      widget.game.description.isNotEmpty
-                          ? widget.game.description
-                          : 'No description available.',
-                      style: AppTextStyles.regular.copyWith(
-                        color: Colors.white,
-                        fontSize: 14.sp,
-                        height: 1.5,
-                      ),
+                    Builder(
+                      builder: (context) {
+                        final game = _currentGame ?? widget.game;
+                        return Text(
+                          game.description.isNotEmpty
+                              ? game.description
+                              : 'No description available.',
+                          style: AppTextStyles.regular.copyWith(
+                            color: Colors.white,
+                            fontSize: 14.sp,
+                            height: 1.5,
+                          ),
+                        );
+                      },
                     ),
 
                     40.verticalSpace,

@@ -92,7 +92,6 @@ class _GamesScreenState extends State<GamesScreen> {
     }
   }
 
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -219,7 +218,8 @@ class _GamesScreenState extends State<GamesScreen> {
                         child: PageView.builder(
                           controller: _pageController,
                           itemCount:
-                              featuredGames.length * 2000, // For infinite scroll
+                              featuredGames.length *
+                              2000, // For infinite scroll
                           onPageChanged: (index) {
                             setState(() {
                               _currentIndex = index % featuredGames.length;
@@ -277,25 +277,29 @@ class _GamesScreenState extends State<GamesScreen> {
                                           ),
                                           decoration: BoxDecoration(
                                             image: DecorationImage(
-                                              image: game.imageUrl
-                                                      .startsWith('http')
+                                              image:
+                                                  game.imageUrl.startsWith(
+                                                    'http',
+                                                  )
                                                   ? NetworkImage(game.imageUrl)
                                                   : AssetImage(game.imageUrl)
                                                         as ImageProvider,
-                                              fit: BoxFit.cover,
-                                              onError:
-                                                  (exception, stackTrace) {
+                                              fit: BoxFit.fill,
+                                              onError: (exception, stackTrace) {
                                                 // Fallback to placeholder if image fails
                                               },
                                             ),
-                                            borderRadius:
-                                                BorderRadius.circular(20.r),
+                                            borderRadius: BorderRadius.circular(
+                                              20.r,
+                                            ),
                                             boxShadow: [
                                               BoxShadow(
-                                                color: Colors.black
-                                                    .withOpacity(0.3),
-                                                blurRadius:
-                                                    isCenter ? 20.r : 10.r,
+                                                color: Colors.black.withOpacity(
+                                                  0.3,
+                                                ),
+                                                blurRadius: isCenter
+                                                    ? 20.r
+                                                    : 10.r,
                                                 offset: Offset(
                                                   0,
                                                   isCenter ? 10.h : 5.h,
@@ -334,10 +338,12 @@ class _GamesScreenState extends State<GamesScreen> {
                                           game.title,
                                           style: AppTextStyles.lufgaLarge
                                               .copyWith(
-                                            color: Colors.white,
-                                            fontSize: isCenter ? 18.sp : 14.sp,
-                                            fontWeight: FontWeight.bold,
-                                          ),
+                                                color: Colors.white,
+                                                fontSize: isCenter
+                                                    ? 18.sp
+                                                    : 14.sp,
+                                                fontWeight: FontWeight.bold,
+                                              ),
                                           textAlign: TextAlign.center,
                                           maxLines: 2,
                                           overflow: TextOverflow.ellipsis,
@@ -380,11 +386,11 @@ class _GamesScreenState extends State<GamesScreen> {
                               physics: NeverScrollableScrollPhysics(),
                               gridDelegate:
                                   SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: 3,
-                                crossAxisSpacing: 16.w,
-                                mainAxisSpacing: 16.h,
-                                childAspectRatio: 0.45,
-                              ),
+                                    crossAxisCount: 3,
+                                    crossAxisSpacing: 16.w,
+                                    mainAxisSpacing: 16.h,
+                                    childAspectRatio: 0.45,
+                                  ),
                               itemCount: featuredGames.length > 6
                                   ? 6
                                   : featuredGames.length, // Show max 6 games
@@ -413,7 +419,9 @@ class _GamesScreenState extends State<GamesScreen> {
               ] else ...[
                 // Search Results
                 StreamBuilder<List<GameModel>>(
-                  key: ValueKey('games_search_${_searchQuery.trim().toLowerCase()}'),
+                  key: ValueKey(
+                    'games_search_${_searchQuery.trim().toLowerCase()}',
+                  ),
                   stream: GameService.searchGames(_searchQuery),
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting &&
@@ -483,11 +491,11 @@ class _GamesScreenState extends State<GamesScreen> {
                             physics: NeverScrollableScrollPhysics(),
                             gridDelegate:
                                 SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: 3,
-                              crossAxisSpacing: 16.w,
-                              mainAxisSpacing: 16.h,
-                              childAspectRatio: 0.45,
-                            ),
+                                  crossAxisCount: 3,
+                                  crossAxisSpacing: 16.w,
+                                  mainAxisSpacing: 16.h,
+                                  childAspectRatio: 0.45,
+                                ),
                             itemCount: games.length,
                             itemBuilder: (context, index) {
                               final game = games[index];
