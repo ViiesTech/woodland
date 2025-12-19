@@ -20,6 +20,8 @@ import '../../services/book_service.dart';
 import '../../components/utils/custom_toast.dart';
 import '../../services/bookmark_service.dart';
 import '../../services/viewed_books_service.dart';
+import '../../services/purchase_service.dart';
+import '../../services/stripe_service.dart';
 
 class BookDetailScreen extends StatefulWidget {
   final BookModel book;
@@ -37,6 +39,8 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
   String? _currentUserId;
   List<BookModel> _similarBooks = [];
   bool _isLoadingSimilarBooks = true;
+  bool _isOwned = false;
+  bool _isCheckingOwnership = true;
 
   @override
   void initState() {
@@ -46,6 +50,114 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
     _loadBookmarkStatus();
     _markBookAsViewed();
     _loadSimilarBooks();
+    _checkOwnership();
+  }
+
+  Future<void> _checkOwnership() async {
+    final authState = context.read<AuthBloc>().state;
+    if (authState is Authenticated) {
+      _currentUserId = authState.user.id;
+      try {
+        final isOwned = await PurchaseService.isBookOwned(
+          _currentUserId!,
+          _book.id,
+        );
+        if (mounted) {
+          setState(() {
+            // Only mark as owned if explicitly in purchased list OR price is 0 (free)
+            _isOwned = isOwned || _book.price == 0;
+            _isCheckingOwnership = false;
+          });
+        }
+      } catch (e) {
+        print('Error checking ownership: $e');
+        if (mounted) {
+          setState(() {
+            // On error, only consider owned if price is 0
+            _isOwned = _book.price == 0;
+            _isCheckingOwnership = false;
+          });
+        }
+      }
+    } else {
+      if (mounted) {
+        setState(() {
+          // Not logged in, only free books are accessible
+          _isOwned = _book.price == 0;
+          _isCheckingOwnership = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _handlePurchase() async {
+    if (_currentUserId == null) {
+      CustomToast.showError(context, 'Please login to purchase books');
+      return;
+    }
+
+    final authState = context.read<AuthBloc>().state;
+    if (authState is! Authenticated) {
+      CustomToast.showError(context, 'Please login to purchase books');
+      return;
+    }
+
+    try {
+      // Open Stripe checkout - returns payment details if successful
+      final paymentResult = await StripeService.openStripeCheckout(
+        context: context,
+        bookId: _book.id,
+        bookTitle: _book.title,
+        price: _book.price,
+        userId: _currentUserId!,
+        userEmail: authState.user.email,
+      );
+
+      // Only proceed if payment result exists and is successful
+      if (paymentResult == null) {
+        // User cancelled - do nothing, don't add book
+        return;
+      }
+
+      if (paymentResult['success'] == true) {
+        // Payment successful - ONLY NOW add book with payment details
+        final paymentId = paymentResult['paymentId'] as String?;
+        final transactionId = paymentResult['transactionId'] as String?;
+        final amount = paymentResult['amount'] as double?;
+        final timestamp = paymentResult['timestamp'] as String?;
+
+        // Add book to purchased list with payment details
+        await PurchaseService.addPurchasedBook(
+          _currentUserId!,
+          _book.id,
+          paymentId: paymentId,
+          transactionId: transactionId,
+          amount: amount,
+          purchaseDate: timestamp != null ? DateTime.parse(timestamp) : null,
+        );
+
+        if (mounted) {
+          // Refresh ownership status
+          await _checkOwnership();
+          CustomToast.showSuccess(
+            context,
+            'Purchase successful! Book added to your library.',
+          );
+        }
+      } else {
+        // Payment failed or cancelled
+        final error =
+            paymentResult['error'] as String? ?? 'Payment failed or cancelled';
+        if (mounted) {
+          CustomToast.showError(context, error);
+        }
+        // DO NOT add book - it should not be in the list
+      }
+    } catch (e) {
+      if (mounted) {
+        CustomToast.showError(context, 'Error processing purchase: $e');
+      }
+    }
   }
 
   void _markBookAsViewed() {
@@ -343,38 +455,192 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
                                   fontSize: 14.sp,
                                 ),
                               ),
+                              8.verticalSpace,
+                              // Price - Show strikethrough and "Owned" if book is owned (not for admin)
+                              BlocBuilder<AuthBloc, AuthState>(
+                                builder: (context, state) {
+                                  final isAdmin =
+                                      state is Authenticated &&
+                                      state.user.role == 'admin';
+
+                                  // Admin always sees regular price
+                                  if (isAdmin) {
+                                    return Text(
+                                      '\$${(_book.price).toStringAsFixed(2)}',
+                                      style: AppTextStyles.lufgaMedium.copyWith(
+                                        color: AppColors.primaryColor,
+                                        fontSize: 24.sp,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    );
+                                  }
+
+                                  // Regular users see owned status
+                                  if (_isCheckingOwnership) {
+                                    return SizedBox(
+                                      height: 30.h,
+                                      child: Center(
+                                        child: CircularProgressIndicator(
+                                          color: AppColors.primaryColor,
+                                          strokeWidth: 2,
+                                        ),
+                                      ),
+                                    );
+                                  } else if (_isOwned) {
+                                    return Column(
+                                      children: [
+                                        // Strikethrough original price
+                                        Text(
+                                          '\$${(_book.price).toStringAsFixed(2)}',
+                                          style: AppTextStyles.lufgaMedium
+                                              .copyWith(
+                                                color: Colors.grey[600],
+                                                fontSize: 20.sp,
+                                                fontWeight: FontWeight.bold,
+                                                decoration:
+                                                    TextDecoration.lineThrough,
+                                                decorationColor:
+                                                    Colors.grey[600],
+                                              ),
+                                        ),
+                                        4.verticalSpace,
+                                        // "Owned" text
+                                        Container(
+                                          padding: EdgeInsets.symmetric(
+                                            horizontal: 16.w,
+                                            vertical: 6.h,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: AppColors.primaryColor
+                                                .withOpacity(0.2),
+                                            borderRadius: BorderRadius.circular(
+                                              20.r,
+                                            ),
+                                            border: Border.all(
+                                              color: AppColors.primaryColor,
+                                            ),
+                                          ),
+                                          child: Text(
+                                            'OWNED',
+                                            style: AppTextStyles.lufgaMedium
+                                                .copyWith(
+                                                  color: AppColors.primaryColor,
+                                                  fontSize: 08.sp,
+                                                ),
+                                          ),
+                                        ),
+                                      ],
+                                    );
+                                  } else {
+                                    // Regular price display
+                                    return Text(
+                                      '\$${(_book.price).toStringAsFixed(2)}',
+                                      style: AppTextStyles.lufgaMedium.copyWith(
+                                        color: AppColors.primaryColor,
+                                        fontSize: 24.sp,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    );
+                                  }
+                                },
+                              ),
                               20.verticalSpace,
-                              // Action Buttons - Show based on book type
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  if (_book.type == BookType.ebook)
-                                    GestureDetector(
-                                      onTap: () {
-                                        AppRouter.routeTo(
-                                          context,
-                                          ReadingScreen(book: _book),
-                                        );
-                                      },
-                                      child: _buildActionButton(
-                                        icon: Icons.menu_book,
-                                        text: 'Read Book',
+                              // Action Buttons - Admin always sees Read/Listen, regular users see purchase if not owned
+                              BlocBuilder<AuthBloc, AuthState>(
+                                builder: (context, state) {
+                                  final isAdmin =
+                                      state is Authenticated &&
+                                      state.user.role == 'admin';
+
+                                  // Admin always sees Read/Listen buttons
+                                  if (isAdmin) {
+                                    return Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        if (_book.type == BookType.ebook)
+                                          GestureDetector(
+                                            onTap: () {
+                                              AppRouter.routeTo(
+                                                context,
+                                                ReadingScreen(book: _book),
+                                              );
+                                            },
+                                            child: _buildActionButton(
+                                              icon: Icons.menu_book,
+                                              text: 'Read Book',
+                                            ),
+                                          ),
+                                        if (_book.type == BookType.audiobook)
+                                          GestureDetector(
+                                            onTap: () {
+                                              AppRouter.routeTo(
+                                                context,
+                                                ListenScreen(book: _book),
+                                              );
+                                            },
+                                            child: _buildActionButton(
+                                              icon: Icons.headphones,
+                                              text: 'Listen Book',
+                                            ),
+                                          ),
+                                      ],
+                                    );
+                                  }
+
+                                  // Regular users
+                                  if (_isCheckingOwnership) {
+                                    return Center(
+                                      child: CircularProgressIndicator(
+                                        color: AppColors.primaryColor,
                                       ),
-                                    ),
-                                  if (_book.type == BookType.audiobook)
-                                    GestureDetector(
-                                      onTap: () {
-                                        AppRouter.routeTo(
-                                          context,
-                                          ListenScreen(book: _book),
-                                        );
-                                      },
+                                    );
+                                  } else if (_isOwned) {
+                                    // Only show Read/Listen if book is explicitly owned
+                                    return Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        if (_book.type == BookType.ebook)
+                                          GestureDetector(
+                                            onTap: () {
+                                              AppRouter.routeTo(
+                                                context,
+                                                ReadingScreen(book: _book),
+                                              );
+                                            },
+                                            child: _buildActionButton(
+                                              icon: Icons.menu_book,
+                                              text: 'Read Book',
+                                            ),
+                                          ),
+                                        if (_book.type == BookType.audiobook)
+                                          GestureDetector(
+                                            onTap: () {
+                                              AppRouter.routeTo(
+                                                context,
+                                                ListenScreen(book: _book),
+                                              );
+                                            },
+                                            child: _buildActionButton(
+                                              icon: Icons.headphones,
+                                              text: 'Listen Book',
+                                            ),
+                                          ),
+                                      ],
+                                    );
+                                  } else {
+                                    // Show purchase button if not owned
+                                    return GestureDetector(
+                                      onTap: _handlePurchase,
                                       child: _buildActionButton(
-                                        icon: Icons.headphones,
-                                        text: 'Listen Book',
+                                        icon: Icons.shopping_cart,
+                                        text:
+                                            'Purchase - \$${(_book.price).toStringAsFixed(2)}',
                                       ),
-                                    ),
-                                ],
+                                    );
+                                  }
+                                },
                               ),
 
                               // Content Sections

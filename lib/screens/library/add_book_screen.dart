@@ -28,6 +28,9 @@ class _AddBookScreenState extends State<AddBookScreen> {
   final TextEditingController _authorController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
   final TextEditingController _categoryController = TextEditingController();
+  final TextEditingController _priceController = TextEditingController(
+    text: '0.0',
+  );
 
   BookType _selectedType = BookType.ebook;
   File? _coverImageFile;
@@ -74,6 +77,7 @@ class _AddBookScreenState extends State<AddBookScreen> {
     _authorController.dispose();
     _descriptionController.dispose();
     _categoryController.dispose();
+    _priceController.dispose();
     // Dispose chapter controllers
     for (var chapter in _chapters) {
       if (chapter['controller'] != null) {
@@ -543,6 +547,8 @@ class _AddBookScreenState extends State<AddBookScreen> {
         }
       }
 
+      final price = double.tryParse(_priceController.text.trim()) ?? 0.0;
+
       final book = BookModel(
         id: '', // Will be set by Firestore
         title: _titleController.text.trim(),
@@ -558,6 +564,7 @@ class _AddBookScreenState extends State<AddBookScreen> {
         type: _selectedType,
         readTime: 0, // No longer used
         listenTime: 0, // No longer used
+        price: price,
         isPublished: _isPublished,
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
@@ -733,6 +740,24 @@ class _AddBookScreenState extends State<AddBookScreen> {
               PrimaryTextField(
                 controller: _categoryController,
                 hint: 'Category (default: ${_categories[0]})',
+              ),
+              16.verticalSpace,
+
+              // Price
+              PrimaryTextField(
+                controller: _priceController,
+                hint: 'Price (USD) *',
+                keyboard: TextInputType.numberWithOptions(decimal: true),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Price is required';
+                  }
+                  final price = double.tryParse(value);
+                  if (price == null || price < 0) {
+                    return 'Please enter a valid price';
+                  }
+                  return null;
+                },
               ),
               16.verticalSpace,
 

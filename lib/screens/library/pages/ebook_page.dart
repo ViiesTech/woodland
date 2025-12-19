@@ -14,6 +14,7 @@ import 'package:the_woodlands_series/components/resource/app_routers.dart';
 import 'package:the_woodlands_series/bloc/auth/auth_bloc.dart';
 import 'package:the_woodlands_series/bloc/auth/auth_state.dart';
 import 'package:the_woodlands_series/components/button/bookmark_icon_button.dart';
+import 'package:the_woodlands_series/services/purchase_service.dart';
 
 class EbookPage extends StatefulWidget {
   const EbookPage({super.key});
@@ -29,12 +30,30 @@ class _EbookPageState extends State<EbookPage>
   String? _currentUserId;
   List<BookModel> _recentSearchBooks = [];
   bool _isLoadingRecentSearches = false;
+  Map<String, bool> _ownedBooks = {}; // Map of bookId -> isOwned
 
   @override
   void initState() {
     super.initState();
     _getCurrentUserId();
     _loadRecentSearches();
+    _loadOwnedBooks();
+  }
+
+  void _loadOwnedBooks() {
+    final authState = context.read<AuthBloc>().state;
+    if (authState is Authenticated) {
+      _currentUserId = authState.user.id;
+      PurchaseService.getPurchasedBooksStream(_currentUserId!).listen((
+        bookIds,
+      ) {
+        if (mounted) {
+          setState(() {
+            _ownedBooks = {for (var id in bookIds) id: true};
+          });
+        }
+      });
+    }
   }
 
   void _getCurrentUserId() {
@@ -326,6 +345,10 @@ class _EbookPageState extends State<EbookPage>
   }
 
   Widget _buildBookCard(BookModel book) {
+    // Check if book is owned: either in owned list OR price is 0 (free)
+    final isInOwnedList = _ownedBooks[book.id] == true;
+    final isOwned = isInOwnedList || book.price == 0;
+
     return Stack(
       children: [
         GestureDetector(
@@ -363,6 +386,53 @@ class _EbookPageState extends State<EbookPage>
             book: book,
           ),
         ),
+        // Price overlay or OWNED badge
+        if (isOwned)
+          Positioned(
+            left: 2.w,
+            right: 2.w,
+            top: 94.h,
+            child: Container(
+              padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.7),
+                borderRadius: BorderRadius.circular(4.r),
+              ),
+              child: Text(
+                'OWNED',
+                style: AppTextStyles.small.copyWith(
+                  color: AppColors.primaryColor,
+                  fontSize: 10.sp,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 0.5,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          )
+        else
+          Positioned(
+            left: 2.w,
+            right: 2.w,
+            top: 94.h,
+            child: Container(
+              padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.7),
+                borderRadius: BorderRadius.circular(4.r),
+              ),
+              child: Text(
+                '\$${book.price.toStringAsFixed(2)}',
+                style: AppTextStyles.small.copyWith(
+                  color: Colors.white,
+                  fontSize: 10.sp,
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
+
         // Bookmark button overlay - independent widget that manages its own state
         if (_currentUserId != null)
           Positioned(

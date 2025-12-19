@@ -28,6 +28,7 @@ class BookModel {
   final bool isPublished;
   final bool
   hasEverBeenPublished; // Track if book has ever been published (for "Coming Soon" logic)
+  final double price; // Price of the book in USD
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -51,6 +52,7 @@ class BookModel {
     this.listenedUserCount = 0,
     required this.isPublished,
     this.hasEverBeenPublished = false,
+    this.price = 0.0,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -75,6 +77,7 @@ class BookModel {
       'listenedUserCount': listenedUserCount,
       'isPublished': isPublished,
       'hasEverBeenPublished': hasEverBeenPublished,
+      'price': price,
       'createdAt': Timestamp.fromDate(createdAt),
       'updatedAt': Timestamp.fromDate(updatedAt),
     };
@@ -109,6 +112,7 @@ class BookModel {
       listenedUserCount: data['listenedUserCount'] as int? ?? 0,
       isPublished: data['isPublished'] as bool? ?? false,
       hasEverBeenPublished: data['hasEverBeenPublished'] as bool? ?? false,
+      price: (data['price'] as num?)?.toDouble() ?? 0.0,
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       updatedAt: (data['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
     );
@@ -136,6 +140,7 @@ class BookModel {
       'listenedUserCount': listenedUserCount,
       'isPublished': isPublished,
       'hasEverBeenPublished': hasEverBeenPublished,
+      'price': price,
       'createdAt': createdAt.millisecondsSinceEpoch,
       'updatedAt': updatedAt.millisecondsSinceEpoch,
     };
@@ -170,6 +175,7 @@ class BookModel {
       listenedUserCount: map['listenedUserCount'] ?? 0,
       isPublished: map['isPublished'] ?? false,
       hasEverBeenPublished: map['hasEverBeenPublished'] ?? false,
+      price: (map['price'] as num?)?.toDouble() ?? 0.0,
       createdAt: DateTime.fromMillisecondsSinceEpoch(map['createdAt'] ?? 0),
       updatedAt: DateTime.fromMillisecondsSinceEpoch(map['updatedAt'] ?? 0),
     );

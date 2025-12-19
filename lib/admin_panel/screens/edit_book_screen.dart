@@ -28,6 +28,7 @@ class _EditBookScreenState extends State<EditBookScreen> {
   late TextEditingController _descriptionController;
   late TextEditingController _coverImageController;
   late TextEditingController _audioFileController;
+  late TextEditingController _priceController;
 
   String _selectedCategory = 'Fiction';
   late BookType _selectedType;
@@ -67,6 +68,9 @@ class _EditBookScreenState extends State<EditBookScreen> {
     _audioFileController = TextEditingController(
       text: widget.book.audioFileUrl ?? '',
     );
+    _priceController = TextEditingController(
+      text: widget.book.price.toStringAsFixed(2),
+    );
 
     // Handle category - if book category is not in list, add it
     final bookCategory = widget.book.category.isNotEmpty
@@ -93,6 +97,7 @@ class _EditBookScreenState extends State<EditBookScreen> {
     _descriptionController.dispose();
     _coverImageController.dispose();
     _audioFileController.dispose();
+    _priceController.dispose();
     super.dispose();
   }
 
@@ -285,6 +290,37 @@ class _EditBookScreenState extends State<EditBookScreen> {
                             },
                           ),
                         ),
+                      ),
+                    ],
+                  ),
+                  16.verticalSpace,
+
+                  // Price Field
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Price (USD) *',
+                        style: AppTextStyles.lufgaMedium.copyWith(
+                          color: Colors.white,
+                          fontSize: 14.sp,
+                        ),
+                      ),
+                      8.verticalSpace,
+                      PrimaryTextField(
+                        controller: _priceController,
+                        hint: 'Enter price in USD',
+                        keyboard: TextInputType.numberWithOptions(decimal: true),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Price is required';
+                          }
+                          final price = double.tryParse(value);
+                          if (price == null || price < 0) {
+                            return 'Please enter a valid price';
+                          }
+                          return null;
+                        },
                       ),
                     ],
                   ),
@@ -568,6 +604,9 @@ class _EditBookScreenState extends State<EditBookScreen> {
         finalPdfUrl = _pdfUrl;
       }
 
+      // Parse price
+      final price = double.tryParse(_priceController.text.trim()) ?? 0.0;
+
       // Create updated book model
       final updatedBook = BookModel(
         id: widget.book.id, // Keep original ID
@@ -582,11 +621,18 @@ class _EditBookScreenState extends State<EditBookScreen> {
                 _audioFileController.text.isNotEmpty
             ? _audioFileController.text.trim()
             : null,
+        chapters: widget.book.chapters, // Keep original chapters
         category: _selectedCategory,
         type: _selectedType,
         readTime: widget.book.readTime, // Keep original read time
         listenTime: widget.book.listenTime, // Keep original listen time
+        listenCount: widget.book.listenCount, // Keep original listen count
+        viewCount: widget.book.viewCount, // Keep original view count
+        readCount: widget.book.readCount, // Keep original read count
+        listenedUserCount: widget.book.listenedUserCount, // Keep original listened user count
+        price: price,
         isPublished: widget.book.isPublished, // Keep original published status
+        hasEverBeenPublished: widget.book.hasEverBeenPublished, // Keep original hasEverBeenPublished
         createdAt: widget.book.createdAt, // Keep original creation date
         updatedAt: DateTime.now(), // Update timestamp
       );

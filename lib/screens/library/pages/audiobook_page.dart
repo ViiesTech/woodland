@@ -15,6 +15,7 @@ import 'package:the_woodlands_series/bloc/auth/auth_bloc.dart';
 import 'package:the_woodlands_series/bloc/auth/auth_state.dart';
 import 'package:the_woodlands_series/services/listening_progress_service.dart';
 import 'package:the_woodlands_series/components/button/bookmark_icon_button.dart';
+import 'package:the_woodlands_series/services/purchase_service.dart';
 
 class AudiobookPage extends StatefulWidget {
   const AudiobookPage({super.key});
@@ -30,6 +31,7 @@ class _AudiobookPageState extends State<AudiobookPage>
   String? _currentUserId;
   Map<String, Map<String, dynamic>> _listeningProgress =
       {}; // Local state for progress
+  Map<String, bool> _ownedBooks = {}; // Map of bookId -> isOwned
 
   @override
   void initState() {
@@ -39,6 +41,21 @@ class _AudiobookPageState extends State<AudiobookPage>
     if (authState is Authenticated) {
       _currentUserId = authState.user.id;
       _listenToProgress();
+      _loadOwnedBooks();
+    }
+  }
+
+  void _loadOwnedBooks() {
+    final authState = context.read<AuthBloc>().state;
+    if (authState is Authenticated) {
+      _currentUserId = authState.user.id;
+      PurchaseService.getPurchasedBooksStream(_currentUserId!).listen((bookIds) {
+        if (mounted) {
+          setState(() {
+            _ownedBooks = {for (var id in bookIds) id: true};
+          });
+        }
+      });
     }
   }
 
@@ -299,6 +316,10 @@ class _AudiobookPageState extends State<AudiobookPage>
   }
 
   Widget _buildTrendingAudiobookCard(BookModel book) {
+    // Check if book is owned: either in owned list OR price is 0 (free)
+    final isInOwnedList = _ownedBooks[book.id] == true;
+    final isOwned = isInOwnedList || book.price == 0;
+    
     return Stack(
       children: [
         GestureDetector(
@@ -322,6 +343,51 @@ class _AudiobookPageState extends State<AudiobookPage>
             book: book,
           ),
         ),
+        // Price overlay
+        Positioned(
+          bottom: 40.h,
+          left: 4.w,
+          right: 4.w,
+          child: Container(
+            padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.7),
+              borderRadius: BorderRadius.circular(4.r),
+            ),
+            child: Text(
+              '\$${book.price.toStringAsFixed(2)}',
+              style: AppTextStyles.small.copyWith(
+                color: Colors.white,
+                fontSize: 10.sp,
+                fontWeight: FontWeight.bold,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ),
+        // Owned badge
+        if (isOwned)
+          Positioned(
+            bottom: 20.h,
+            left: 4.w,
+            right: 4.w,
+            child: Container(
+              padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
+              decoration: BoxDecoration(
+                color: AppColors.primaryColor.withOpacity(0.9),
+                borderRadius: BorderRadius.circular(4.r),
+              ),
+              child: Text(
+                'Owned',
+                style: AppTextStyles.small.copyWith(
+                  color: Colors.white,
+                  fontSize: 9.sp,
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
         // Bookmark button overlay
         if (_currentUserId != null)
           Positioned(
@@ -553,6 +619,10 @@ class _AudiobookPageState extends State<AudiobookPage>
   }
 
   Widget _buildBookCard(BookModel book, {Map<String, dynamic>? progress}) {
+    // Check if book is owned: either in owned list OR price is 0 (free)
+    final isInOwnedList = _ownedBooks[book.id] == true;
+    final isOwned = isInOwnedList || book.price == 0;
+    
     return Stack(
       children: [
         GestureDetector(
@@ -592,6 +662,51 @@ class _AudiobookPageState extends State<AudiobookPage>
                   color: AppColors.primaryColor,
                   fontSize: 10.sp,
                 ),
+              ),
+            ),
+          ),
+        // Price overlay
+        Positioned(
+          bottom: isOwned ? 20.h : 40.h,
+          left: 4.w,
+          right: 4.w,
+          child: Container(
+            padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.7),
+              borderRadius: BorderRadius.circular(4.r),
+            ),
+            child: Text(
+              '\$${book.price.toStringAsFixed(2)}',
+              style: AppTextStyles.small.copyWith(
+                color: Colors.white,
+                fontSize: 10.sp,
+                fontWeight: FontWeight.bold,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ),
+        // Owned badge
+        if (isOwned)
+          Positioned(
+            bottom: 20.h,
+            left: 4.w,
+            right: 4.w,
+            child: Container(
+              padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
+              decoration: BoxDecoration(
+                color: AppColors.primaryColor.withOpacity(0.9),
+                borderRadius: BorderRadius.circular(4.r),
+              ),
+              child: Text(
+                'Owned',
+                style: AppTextStyles.small.copyWith(
+                  color: Colors.white,
+                  fontSize: 9.sp,
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
               ),
             ),
           ),
