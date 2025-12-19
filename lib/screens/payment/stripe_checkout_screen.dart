@@ -33,7 +33,7 @@ class _StripeCheckoutScreenState extends State<StripeCheckoutScreen> {
 
 
 
-  String backendUrl = 'https://woodland.codefied.co';
+  String backendUrl = 'https://apps.codefied.co/woodland';
 
   @override
   void initState() {
