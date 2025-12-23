@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import '../screens/payment/stripe_checkout_screen.dart';
 
 class StripeService {
-  // Stripe test publishable key - Replace with your actual test key
+  // Stripe live publishable key
   static const String stripeTestPublishableKey =
-      'pk_test_51QK8XqP3JZ4xYzABcDeFgHiJkLmNoPqRsTuVwXyZaBc1234567890';
+      'pk_live_51SG0n8DpfvqzBzFilSGwrGzKH18BSrZRlJu97UZ98m1O1q7fSsUJpNDNXVamqTAKEkEYJH4pjY4Jr80jBiq6STq200ZkXuVe03';
 
   /// Open Stripe Checkout for book purchase using InAppWebView
   /// Returns payment result with details or null if cancelled
