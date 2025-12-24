@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -12,6 +13,8 @@ import 'package:the_woodlands_series/components/textfield/primary_textfield.dart
 import 'package:the_woodlands_series/components/utils/custom_toast.dart';
 import 'package:the_woodlands_series/screens/register/register_screen.dart';
 import 'package:the_woodlands_series/screens/forgot_password/forgot_password_screen.dart';
+import 'package:the_woodlands_series/screens/terms_of_service/terms_of_service_screen.dart';
+import 'package:the_woodlands_series/screens/privacy_policy/privacy_policy_screen.dart';
 import 'package:the_woodlands_series/bloc/auth/auth_bloc.dart';
 import 'package:the_woodlands_series/bloc/auth/auth_event.dart';
 import 'package:the_woodlands_series/bloc/auth/auth_state.dart';
@@ -324,6 +327,10 @@ class _LoginScreenState extends State<LoginScreen> {
                       Expanded(
                         child: RichText(
                           text: TextSpan(
+                            style: AppTextStyles.small.copyWith(
+                              color: Colors.white.withOpacity(0.8),
+                              fontSize: 14.sp,
+                            ),
                             children: [
                               TextSpan(text: "I agree to the "),
                               TextSpan(
@@ -331,7 +338,15 @@ class _LoginScreenState extends State<LoginScreen> {
                                 style: AppTextStyles.small.copyWith(
                                   color: AppColors.primaryColor,
                                   fontWeight: FontWeight.w500,
+                                  fontSize: 14.sp,
                                 ),
+                                recognizer: TapGestureRecognizer()
+                                  ..onTap = () {
+                                    AppRouter.routeTo(
+                                      context,
+                                      const TermsOfServiceScreen(),
+                                    );
+                                  },
                               ),
                               TextSpan(text: " and "),
                               TextSpan(
@@ -339,7 +354,15 @@ class _LoginScreenState extends State<LoginScreen> {
                                 style: AppTextStyles.small.copyWith(
                                   color: AppColors.primaryColor,
                                   fontWeight: FontWeight.w500,
+                                  fontSize: 14.sp,
                                 ),
+                                recognizer: TapGestureRecognizer()
+                                  ..onTap = () {
+                                    AppRouter.routeTo(
+                                      context,
+                                      const PrivacyPolicyScreen(),
+                                    );
+                                  },
                               ),
                             ],
                           ),
