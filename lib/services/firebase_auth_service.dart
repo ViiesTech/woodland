@@ -131,6 +131,21 @@ class FirebaseAuthService {
     }
   }
 
+  /// Delete current user account from Firebase Auth
+  static Future<void> deleteUser() async {
+    try {
+      final User? firebaseUser = _auth.currentUser;
+      if (firebaseUser != null) {
+        await firebaseUser.delete();
+        await _googleSignIn.signOut();
+      } else {
+        throw Exception('No user is currently signed in');
+      }
+    } catch (e) {
+      throw Exception('Error deleting user: ${e.toString()}');
+    }
+  }
+
   /// Get current Firebase user
   static User? getCurrentUser() {
     return _auth.currentUser;

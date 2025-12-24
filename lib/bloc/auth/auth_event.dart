@@ -84,3 +84,8 @@ class UpdateUser extends AuthEvent {
   @override
   List<Object?> get props => [user];
 }
+
+// Event to delete user account
+class DeleteUser extends AuthEvent {
+  const DeleteUser();
+}

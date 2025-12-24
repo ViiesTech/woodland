@@ -34,6 +34,9 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
 
     // Update user profile
     on<UpdateUser>(_onUpdateUser);
+
+    // Delete user account
+    on<DeleteUser>(_onDeleteUser);
   }
 
   // Check if user is already logged in
@@ -306,6 +309,21 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       emit(Authenticated(event.user));
     } catch (e) {
       emit(AuthError('Error updating user: ${e.toString()}'));
+    }
+  }
+
+  // Delete user account
+  Future<void> _onDeleteUser(DeleteUser event, Emitter<AuthState> emit) async {
+    emit(const AuthLoading());
+    try {
+      final success = await authRepository.deleteUser();
+      if (success) {
+        emit(const Unauthenticated());
+      } else {
+        emit(const AuthError('Failed to delete account'));
+      }
+    } catch (e) {
+      emit(AuthError('Error deleting account: ${e.toString()}'));
     }
   }
 }

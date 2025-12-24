@@ -41,6 +41,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   UserModel? currentUser;
   String? _currentUserId;
   bool _isAdmin = false;
+  bool _isDeletingAccount = false; // Track if account deletion was initiated
   Map<String, Map<String, dynamic>> _viewedBooksProgress = {};
   List<BookModel> _allViewedBooks = []; // All viewed books (both types)
   BookModel? _latestListeningBook; // Latest book with listening progress
@@ -174,9 +175,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
           _showLoadingDialog(context);
         } else if (state is Unauthenticated) {
           // Dismiss loading dialog
-          Navigator.of(context, rootNavigator: true).pop();
-          // Navigate to login screen after successful logout
-          CustomToast.showSuccess(context, 'Logged out successfully!');
+          try {
+            Navigator.of(context, rootNavigator: true).pop();
+          } catch (e) {
+            // Dialog might not be showing
+          }
+          // Show appropriate message based on whether delete was initiated
+          final message = _isDeletingAccount
+              ? 'Account deleted successfully!'
+              : 'Logged out successfully!';
+          _isDeletingAccount = false; // Reset flag
+          CustomToast.showSuccess(context, message);
           Future.delayed(const Duration(milliseconds: 500), () {
             if (context.mounted) {
               AppRouter.clearStack(context, const LoginScreen());
@@ -184,7 +193,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
           });
         } else if (state is AuthError) {
           // Dismiss loading dialog if showing
-          Navigator.of(context, rootNavigator: true).pop();
+          try {
+            Navigator.of(context, rootNavigator: true).pop();
+          } catch (e) {
+            // Dialog might not be showing
+          }
+          // Reset delete flag if delete failed
+          if (_isDeletingAccount) {
+            setState(() {
+              _isDeletingAccount = false;
+            });
+          }
           // Show error message
           CustomToast.showError(context, state.message);
         }
@@ -459,6 +478,49 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                       16.verticalSpace,
 
+                      // Delete Account Section
+                      GestureDetector(
+                        onTap: _handleDeleteAccount,
+                        child: Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 16.w,
+                            vertical: 16.h,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.red.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(12.r),
+                            border: Border.all(
+                              color: Colors.red.withOpacity(0.5),
+                              width: 1,
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.delete_outline,
+                                color: Colors.red,
+                                size: 24.sp,
+                              ),
+                              16.horizontalSpace,
+                              Text(
+                                'Delete Account',
+                                style: AppTextStyles.lufgaLarge.copyWith(
+                                  color: Colors.red,
+                                  fontSize: 16.sp,
+                                ),
+                              ),
+                              Spacer(),
+                              Icon(
+                                Icons.arrow_forward_ios,
+                                color: Colors.red.withOpacity(0.5),
+                                size: 16.sp,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      16.verticalSpace,
+
                       // Currently Playing (if any) - Show even if paused/stopped or app restarted
                       ListenableBuilder(
                         listenable: GlobalAudioService(),
@@ -604,6 +666,63 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 'Logout',
                 style: TextStyle(
                   color: AppColors.primaryColor,
+                  fontSize: 14.sp,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _handleDeleteAccount() {
+    // Show confirmation dialog
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          backgroundColor: AppColors.boxClr,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16.r),
+          ),
+          title: Text(
+            'Delete Account',
+            style: AppTextStyles.lufgaLarge.copyWith(
+              color: Colors.red,
+              fontSize: 20.sp,
+            ),
+          ),
+          content: Text(
+            'Are you sure you want to delete your account? This action cannot be undone and all your data will be permanently deleted.',
+            style: AppTextStyles.lufgaMedium.copyWith(
+              color: Colors.white.withOpacity(0.7),
+              fontSize: 14.sp,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: Text(
+                'No',
+                style: TextStyle(color: Colors.grey, fontSize: 14.sp),
+              ),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(dialogContext);
+                // Set flag to track that delete was initiated
+                setState(() {
+                  _isDeletingAccount = true;
+                });
+                // Dispatch delete user event (loading will be shown via BlocListener)
+                context.read<AuthBloc>().add(const DeleteUser());
+              },
+              child: Text(
+                'Yes',
+                style: TextStyle(
+                  color: Colors.red,
                   fontSize: 14.sp,
                   fontWeight: FontWeight.bold,
                 ),

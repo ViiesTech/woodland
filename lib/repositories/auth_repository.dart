@@ -145,4 +145,36 @@ class AuthRepository {
   Future<UserModel?> getUserByEmail(String email) async {
     return await UserFirestoreService.getUserByEmail(email);
   }
+
+  // Delete user account completely (Firestore, Firebase Auth, and cache)
+  Future<bool> deleteUser() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final userString = prefs.getString(_userKey);
+      
+      if (userString != null) {
+        final user = UserModel.fromJsonString(userString);
+        
+        // Delete from Firestore
+        await UserFirestoreService.deleteUser(user.id);
+        
+        // Delete from Firebase Auth
+        await FirebaseAuthService.deleteUser();
+        
+        // Clear all SharedPreferences cache
+        await prefs.clear();
+        
+        return true;
+      }
+      
+      // If no cached user, still try to delete from Firebase Auth
+      await FirebaseAuthService.deleteUser();
+      await prefs.clear();
+      
+      return true;
+    } catch (e) {
+      print('Error deleting user: $e');
+      return false;
+    }
+  }
 }
