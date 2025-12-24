@@ -19,7 +19,7 @@ void main() async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
   // Set up deep link method channel listener
-  const MethodChannel channel = MethodChannel('com.glennverse.app/deep_link');
+  const MethodChannel channel = MethodChannel('com.woodlandseries.app/deep_link');
   channel.setMethodCallHandler((call) async {
     if (call.method == 'onDeepLink') {
       final url = call.arguments as String?;

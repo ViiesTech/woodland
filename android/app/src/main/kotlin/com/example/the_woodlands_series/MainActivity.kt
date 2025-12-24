@@ -1,4 +1,4 @@
-package com.glennverse.app
+package com.woodlandseries.app
 
 import android.content.Intent
 import android.net.Uri
@@ -7,7 +7,7 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
-    private val CHANNEL = "com.glennverse.app/deep_link"
+    private val CHANNEL = "com.woodlandseries.app/deep_link"
     private var flutterEngine: FlutterEngine? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {

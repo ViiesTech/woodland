@@ -51,12 +51,16 @@
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
 			<key>CFBundleURLName</key>
-			<string>com.glennverse.app</string>
+			<string>com.woodlandseries.app</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>stripe</string>
 			</array>
 		</dict>
 	</array>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>We need access to your photo library to allow you to upload profile pictures, book covers, and other content images.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>We need access to your camera to allow you to take photos for your profile picture, book covers, and other content.</string>
 </dict>
 </plist>
