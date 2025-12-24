@@ -10,8 +10,7 @@ import 'package:the_woodlands_series/components/resource/app_textstyle.dart';
 import 'package:the_woodlands_series/components/textfield/primary_textfield.dart';
 import 'package:the_woodlands_series/components/utils/custom_toast.dart';
 import 'package:the_woodlands_series/screens/login_screen/login_screen.dart';
-import 'package:the_woodlands_series/screens/terms_of_service/terms_of_service_screen.dart';
-import 'package:the_woodlands_series/screens/privacy_policy/privacy_policy_screen.dart';
+import 'package:the_woodlands_series/screens/web_view/web_view_screen.dart';
 import 'package:the_woodlands_series/bloc/auth/auth_bloc.dart';
 import 'package:the_woodlands_series/bloc/auth/auth_event.dart';
 import 'package:the_woodlands_series/bloc/auth/auth_state.dart';
@@ -170,7 +169,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                   ..onTap = () {
                                     AppRouter.routeTo(
                                       context,
-                                      const TermsOfServiceScreen(),
+                                      const WebViewScreen(
+                                        url: 'https://woodland.codefied.co/TERMS_OF_SERVICE.html',
+                                        title: 'Terms of Service',
+                                      ),
                                     );
                                   },
                               ),
@@ -186,7 +188,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                   ..onTap = () {
                                     AppRouter.routeTo(
                                       context,
-                                      const PrivacyPolicyScreen(),
+                                      const WebViewScreen(
+                                        url: 'https://woodland.codefied.co/PRIVACY_POLICY.html',
+                                        title: 'Privacy Policy',
+                                      ),
                                     );
                                   },
                               ),
