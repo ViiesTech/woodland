@@ -60,7 +60,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '931656574267',
     projectId: 'glennverse-3cf94',
     storageBucket: 'glennverse-3cf94.firebasestorage.app',
-    iosBundleId: 'com.glennverse.app',
+    iosBundleId: 'com.woodlandseries.app',
   );
 
   static const FirebaseOptions web = FirebaseOptions(

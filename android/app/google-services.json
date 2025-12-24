@@ -9,7 +9,7 @@
       "client_info": {
         "mobilesdk_app_id": "1:931656574267:android:e63638eaf0dce348b9c31e",
         "android_client_info": {
-          "package_name": "com.glennverse.app"
+          "package_name": "com.woodlandseries.app"
         }
       },
       "oauth_client": [
@@ -17,7 +17,7 @@
           "client_id": "931656574267-03tu4cr2gtgrm6jucl4qdstcu52qtjae.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
-            "package_name": "com.glennverse.app",
+            "package_name": "com.woodlandseries.app",
             "certificate_hash": "189d785189ffc5c758c76d99d92e970d114674ef"
           }
         },
@@ -42,7 +42,7 @@
               "client_id": "931656574267-sm0f41lsmdi70p8epjievgb23e54qek5.apps.googleusercontent.com",
               "client_type": 2,
               "ios_info": {
-                "bundle_id": "com.glennverse.app"
+                "bundle_id": "com.woodlandseries.app"
               }
             }
           ]

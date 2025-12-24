@@ -3,7 +3,7 @@ import UIKit
 
 @main
 @objc class AppDelegate: FlutterAppDelegate {
-  private let CHANNEL = "com.glennverse.app/deep_link"
+  private let CHANNEL = "com.woodlandseries.app/deep_link"
   private var initialUrl: String?
   
   override func application(
