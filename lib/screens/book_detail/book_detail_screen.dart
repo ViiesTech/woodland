@@ -90,6 +90,8 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
     }
   }
 
+  bool _isPurchasing = false;
+
   Future<void> _handlePurchase() async {
     if (_currentUserId == null) {
       CustomToast.showError(context, 'Please login to purchase books');
@@ -102,10 +104,13 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
       return;
     }
 
+    setState(() {
+      _isPurchasing = true;
+    });
+
     try {
-      // Open Stripe checkout - returns payment details if successful
-      final paymentResult = await StripeService.openStripeCheckout(
-        context: context,
+      // Start Stripe payment flow via external browser
+      final paymentResult = await StripeService.startPayment(
         bookId: _book.id,
         bookTitle: _book.title,
         price: _book.price,
@@ -113,31 +118,26 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
         userEmail: authState.user.email,
       );
 
-      // Only proceed if payment result exists and is successful
-      if (paymentResult == null) {
-        // User cancelled - do nothing, don't add book
-        return;
-      }
+      if (!mounted) return;
 
-      if (paymentResult['success'] == true) {
-        // Payment successful - ONLY NOW add book with payment details
+      if (paymentResult != null && paymentResult['success'] == true) {
+        // Payment successful
         final paymentId = paymentResult['paymentId'] as String?;
         final transactionId = paymentResult['transactionId'] as String?;
         final amount = paymentResult['amount'] as double?;
-        final timestamp = paymentResult['timestamp'] as String?;
 
-        // Add book to purchased list with payment details
+        // Ideally verification should happen on backend callback, but for this flow:
         await PurchaseService.addPurchasedBook(
           _currentUserId!,
           _book.id,
-          paymentId: paymentId,
+          paymentId:
+              paymentId ?? 'stripe_${DateTime.now().millisecondsSinceEpoch}',
           transactionId: transactionId,
-          amount: amount,
-          purchaseDate: timestamp != null ? DateTime.parse(timestamp) : null,
+          amount: amount ?? _book.price,
+          purchaseDate: DateTime.now(),
         );
 
         if (mounted) {
-          // Refresh ownership status
           await _checkOwnership();
           CustomToast.showSuccess(
             context,
@@ -146,16 +146,20 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
         }
       } else {
         // Payment failed or cancelled
-        final error =
-            paymentResult['error'] as String? ?? 'Payment failed or cancelled';
+        final error = paymentResult?['error'] as String? ?? 'Payment cancelled';
         if (mounted) {
           CustomToast.showError(context, error);
         }
-        // DO NOT add book - it should not be in the list
       }
     } catch (e) {
       if (mounted) {
         CustomToast.showError(context, 'Error processing purchase: $e');
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isPurchasing = false;
+        });
       }
     }
   }
@@ -631,6 +635,13 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
                                     );
                                   } else {
                                     // Show purchase button if not owned
+                                    if (_isPurchasing) {
+                                      return Center(
+                                        child: CircularProgressIndicator(
+                                          color: AppColors.primaryColor,
+                                        ),
+                                      );
+                                    }
                                     return GestureDetector(
                                       onTap: _handlePurchase,
                                       child: _buildActionButton(
