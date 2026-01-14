@@ -316,7 +316,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 }
 
                                 return SizedBox(
-                                  height: 200.h,
+                                  height: 220.h,
                                   child: ListView.builder(
                                     scrollDirection: Axis.horizontal,
                                     itemCount: books.length,
@@ -414,7 +414,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                         ConnectionState.waiting &&
                                     !snapshot.hasData) {
                                   return SizedBox(
-                                    height: 200.h,
+                                    height: 220.h,
                                     child: Center(
                                       child: ThreeDotLoader(
                                         color: AppColors.primaryColor,

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'dart:io' show Platform;
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -13,7 +15,6 @@ import 'package:the_woodlands_series/components/textfield/primary_textfield.dart
 import 'package:the_woodlands_series/components/utils/custom_toast.dart';
 import 'package:the_woodlands_series/screens/register/register_screen.dart';
 import 'package:the_woodlands_series/screens/forgot_password/forgot_password_screen.dart';
-import 'package:the_woodlands_series/screens/web_view/web_view_screen.dart';
 import 'package:the_woodlands_series/bloc/auth/auth_bloc.dart';
 import 'package:the_woodlands_series/bloc/auth/auth_event.dart';
 import 'package:the_woodlands_series/bloc/auth/auth_state.dart';
@@ -189,56 +190,61 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                   40.verticalSpace,
-                  // Social Login Buttons
-                  Row(
-                    children: [
-                      // Expanded(
-                      //   child: _buildSocialButton(
-                      //     'Facebook',
-                      //     AppAssets.fbIcon,
-                      //     Colors.blue,
-                      //     shadow: true,
-                      //   ),
-                      // ),
-                      // 16.horizontalSpace,
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: _signInWithGoogle,
-                          child: _buildSocialButton(
-                            'Google',
-                            AppAssets.googleIcon,
-                            Colors.red,
-                            shadow: true,
+                  // Social Login Buttons - Hide on iOS
+                  if (!kIsWeb && Platform.isIOS == false) ...[
+                    Row(
+                      children: [
+                        // Expanded(
+                        //   child: _buildSocialButton(
+                        //     'Facebook',
+                        //     AppAssets.fbIcon,
+                        //     Colors.blue,
+                        //     shadow: true,
+                        //   ),
+                        // ),
+                        // 16.horizontalSpace,
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: _signInWithGoogle,
+                            child: _buildSocialButton(
+                              'Google',
+                              AppAssets.googleIcon,
+                              Colors.red,
+                              shadow: true,
+                            ),
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                  16.verticalSpace,
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Container(height: 1, color: Color(0xffE0E5EC)),
-                      ),
-                      Padding(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: SizeCons.getResponsiveWidth(16),
+                      ],
+                    ),
+                    16.verticalSpace,
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Container(height: 1, color: Color(0xffE0E5EC)),
                         ),
-                        child: Text(
-                          'Or',
-                          style: TextStyle(
-                            color: Colors.green,
-                            fontSize: SizeCons.getResponsiveFontSize(16),
-                            fontWeight: FontWeight.w500,
+                        Padding(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: SizeCons.getResponsiveWidth(16),
+                          ),
+                          child: Text(
+                            'Or',
+                            style: TextStyle(
+                              color: Colors.green,
+                              fontSize: SizeCons.getResponsiveFontSize(16),
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
                         ),
-                      ),
-                      Expanded(
-                        child: Container(height: 1, color: Color(0xffE0E5EC)),
-                      ),
-                    ],
-                  ),
-                  24.verticalSpace,
+                        Expanded(
+                          child: Container(height: 1, color: Color(0xffE0E5EC)),
+                        ),
+                      ],
+                    ),
+                    24.verticalSpace,
+                  ] else ...[
+                    // On iOS, just show spacing without social buttons and "Or" divider
+                    24.verticalSpace,
+                  ],
                   PrimaryTextField(
                     controller: _emailController,
                     hint: 'Email/Phone Number',
@@ -311,72 +317,72 @@ class _LoginScreenState extends State<LoginScreen> {
                   26.verticalSpace,
 
                   // Terms Agreement
-                  Row(
-                    children: [
-                      PrimaryCheckBox(
-                        value: isAgreed,
-                        onChanged: (val) {
-                          setState(() {
-                            isAgreed = !isAgreed;
-                          });
-                        },
-                        keyId: "isAgreed",
-                      ),
-                      8.horizontalSpace,
-                      Expanded(
-                        child: RichText(
-                          text: TextSpan(
-                            style: AppTextStyles.small.copyWith(
-                              color: Colors.white.withOpacity(0.8),
-                              fontSize: 14.sp,
-                            ),
-                            children: [
-                              TextSpan(text: "I agree to the "),
-                              TextSpan(
-                                text: "Terms of Service",
-                                style: AppTextStyles.small.copyWith(
-                                  color: AppColors.primaryColor,
-                                  fontWeight: FontWeight.w500,
-                                  fontSize: 14.sp,
-                                ),
-                                recognizer: TapGestureRecognizer()
-                                  ..onTap = () {
-                                    AppRouter.routeTo(
-                                      context,
-                                      const WebViewScreen(
-                                        url:
-                                            'https://woodland.codefied.co/TERMS_OF_SERVICE.html',
-                                        title: 'Terms of Service',
-                                      ),
-                                    );
-                                  },
-                              ),
-                              TextSpan(text: " and "),
-                              TextSpan(
-                                text: "Privacy Policy",
-                                style: AppTextStyles.small.copyWith(
-                                  color: AppColors.primaryColor,
-                                  fontWeight: FontWeight.w500,
-                                  fontSize: 14.sp,
-                                ),
-                                recognizer: TapGestureRecognizer()
-                                  ..onTap = () {
-                                    AppRouter.routeTo(
-                                      context,
-                                      const WebViewScreen(
-                                        url:
-                                            'https://woodland.codefied.co/PRIVACY_POLICY.html',
-                                        title: 'Privacy Policy',
-                                      ),
-                                    );
-                                  },
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+                  // Row(
+                  //   children: [
+                  //     PrimaryCheckBox(
+                  //       value: isAgreed,
+                  //       onChanged: (val) {
+                  //         setState(() {
+                  //           isAgreed = !isAgreed;
+                  //         });
+                  //       },
+                  //       keyId: "isAgreed",
+                  //     ),
+                  //     8.horizontalSpace,
+                  //     Expanded(
+                  //       child: RichText(
+                  //         text: TextSpan(
+                  //           style: AppTextStyles.small.copyWith(
+                  //             color: Colors.white.withOpacity(0.8),
+                  //             fontSize: 14.sp,
+                  //           ),
+                  //           children: [
+                  //             TextSpan(text: "I agree to the "),
+                  //             TextSpan(
+                  //               text: "Terms of Service",
+                  //               style: AppTextStyles.small.copyWith(
+                  //                 color: AppColors.primaryColor,
+                  //                 fontWeight: FontWeight.w500,
+                  //                 fontSize: 14.sp,
+                  //               ),
+                  //               recognizer: TapGestureRecognizer()
+                  //                 ..onTap = () {
+                  //                   AppRouter.routeTo(
+                  //                     context,
+                  //                     const WebViewScreen(
+                  //                       url:
+                  //                           'https://woodland.codefied.co/TERMS_OF_SERVICE.html',
+                  //                       title: 'Terms of Service',
+                  //                     ),
+                  //                   );
+                  //                 },
+                  //             ),
+                  //             TextSpan(text: " and "),
+                  //             TextSpan(
+                  //               text: "Privacy Policy",
+                  //               style: AppTextStyles.small.copyWith(
+                  //                 color: AppColors.primaryColor,
+                  //                 fontWeight: FontWeight.w500,
+                  //                 fontSize: 14.sp,
+                  //               ),
+                  //               recognizer: TapGestureRecognizer()
+                  //                 ..onTap = () {
+                  //                   AppRouter.routeTo(
+                  //                     context,
+                  //                     const WebViewScreen(
+                  //                       url:
+                  //                           'https://woodland.codefied.co/PRIVACY_POLICY.html',
+                  //                       title: 'Privacy Policy',
+                  //                     ),
+                  //                   );
+                  //                 },
+                  //             ),
+                  //           ],
+                  //         ),
+                  //       ),
+                  //     ),
+                  //   ],
+                  // ),
 
                   26.verticalSpace,
                   PrimaryButton(title: 'Sign In', onTap: _signIn, shadow: true),
@@ -487,13 +493,13 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
-    if (!isAgreed) {
-      CustomToast.showError(
-        context,
-        'Please agree to Terms of Service and Privacy Policy',
-      );
-      return;
-    }
+    // if (!isAgreed) {
+    //   CustomToast.showError(
+    //     context,
+    //     'Please agree to Terms of Service and Privacy Policy',
+    //   );
+    //   return;
+    // }
 
     // Dispatch login event to BLoC with Firebase authentication
     context.read<AuthBloc>().add(

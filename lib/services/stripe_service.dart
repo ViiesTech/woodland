@@ -6,7 +6,7 @@ class StripeService {
   static const String stripeTestPublishableKey =
       'pk_live_51SG0n8DpfvqzBzFilSGwrGzKH18BSrZRlJu97UZ98m1O1q7fSsUJpNDNXVamqTAKEkEYJH4pjY4Jr80jBiq6STq200ZkXuVe03';
 
-  /// Open Stripe Checkout for book purchase using InAppWebView
+  /// Open Stripe Checkout for book purchase using external browser
   /// Returns payment result with details or null if cancelled
   static Future<Map<String, dynamic>?> openStripeCheckout({
     required BuildContext context,
@@ -38,4 +38,3 @@ class StripeService {
     }
   }
 }
-

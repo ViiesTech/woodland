@@ -77,7 +77,40 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         });
       }
     } catch (e) {
-      CustomToast.showError(context, 'Failed to pick image: ${e.toString()}');
+      debugPrint('Error picking image: $e');
+      if (e.toString().contains('camera_not_available')) {
+        if (mounted) {
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('Camera Not Available'),
+              content: const Text(
+                'The iOS Simulator does not support the camera. Would you like to use the Gallery instead?',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancel'),
+                ),
+                TextButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    _pickImage(ImageSource.gallery);
+                  },
+                  child: const Text('Open Gallery'),
+                ),
+              ],
+            ),
+          );
+        }
+        return;
+      }
+
+      String errorMessage = 'Failed to pick image';
+      if (e.toString().contains('access_denied')) {
+        errorMessage = 'Camera permission denied via settings';
+      }
+      CustomToast.showError(context, errorMessage);
     }
   }
 

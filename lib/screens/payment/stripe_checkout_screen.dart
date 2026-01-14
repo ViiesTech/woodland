@@ -4,6 +4,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:app_links/app_links.dart';
 import '../../components/resource/app_colors.dart';
 import '../../components/resource/app_textstyle.dart';
 
@@ -30,15 +31,65 @@ class StripeCheckoutScreen extends StatefulWidget {
 class _StripeCheckoutScreenState extends State<StripeCheckoutScreen> {
   bool _isLoading = true;
   String? _errorMessage;
-
-
+  late AppLinks _appLinks;
+  StreamSubscription<Uri>? _linkSubscription;
 
   String backendUrl = 'https://apps.codefied.co/woodland';
 
   @override
   void initState() {
     super.initState();
+    _initDeepLinks();
     _createCheckoutSession();
+  }
+
+  @override
+  void dispose() {
+    _linkSubscription?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _initDeepLinks() async {
+    _appLinks = AppLinks();
+
+    // Check initial link if app was launched by a deep link
+    try {
+      final initialUri = await _appLinks.getInitialLink();
+      if (initialUri != null) {
+        _handleDeepLink(initialUri);
+      }
+    } catch (e) {
+      debugPrint('Error getting initial link: $e');
+    }
+
+    // Listen to incoming links while app is running
+    _linkSubscription = _appLinks.uriLinkStream.listen(
+      (uri) {
+        debugPrint('🔗 Received deep link: $uri');
+        _handleDeepLink(uri);
+      },
+      onError: (err) {
+        debugPrint('❌ deep link error: $err');
+      },
+    );
+  }
+
+  void _handleDeepLink(Uri uri) {
+    if (!mounted) return;
+
+    debugPrint('Handling deep link: $uri');
+
+    if (uri.scheme == 'stripe') {
+      if (uri.host == 'payment-success') {
+        // Payment successful
+        Navigator.of(context).pop({'success': true});
+      } else if (uri.host == 'payment-cancel') {
+        // Payment cancelled
+        Navigator.of(
+          context,
+        ).pop({'success': false, 'error': 'Payment cancelled'});
+      }
+    }
   }
 
   Future<void> _createCheckoutSession() async {

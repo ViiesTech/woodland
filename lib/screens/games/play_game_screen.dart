@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'dart:io' show Platform;
 import 'package:the_woodlands_series/components/resource/app_colors.dart';
 import 'package:the_woodlands_series/components/resource/app_textstyle.dart';
 import 'package:the_woodlands_series/components/utils/three_dot_loader.dart';
@@ -24,26 +26,181 @@ class _PlayGameScreenState extends State<PlayGameScreen> {
   InAppWebViewController? _webViewController;
   bool _isLoading = true;
   bool _hasError = false;
+  bool _hasContent = false;
+  bool _showExternalBrowserOption = false;
   double _progress = 0;
+  static const Duration _contentCheckDelay = Duration(seconds: 15);
+  static const Duration _maxLoadingDuration = Duration(seconds: 30);
 
   @override
   void initState() {
     super.initState();
+    final isIOS = !kIsWeb && Platform.isIOS;
+    
+    // On iOS, automatically open in external browser due to WebKit networking issues
+    if (isIOS) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _openInExternalBrowser();
+        // Close this screen after opening external browser
+        Future.delayed(Duration(milliseconds: 500), () {
+          if (mounted) {
+            Navigator.of(context).pop();
+          }
+        });
+      });
+      return;
+    }
+    
+    // For Android and other platforms, use in-app WebView
+    // Start timeout fallback and content detection
+    _startContentDetection();
+    _startLoadingTimeout();
     // Load game after first frame
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadGame();
     });
   }
 
+  void _startContentDetection() {
+    // Check if content actually loaded after delay
+    Future.delayed(_contentCheckDelay, () {
+      if (mounted && !_hasContent && !_hasError) {
+        _checkForContent();
+      }
+    });
+  }
+
+  void _startLoadingTimeout() {
+    // Fallback: hide loading after max duration and offer external browser
+    Future.delayed(_maxLoadingDuration, () {
+      if (mounted && _isLoading) {
+        print('Loading timeout reached after ${_maxLoadingDuration.inSeconds}s');
+        _checkForContent();
+        setState(() {
+          _isLoading = false;
+          if (!_hasContent && !_hasError) {
+            _showExternalBrowserOption = true;
+          }
+        });
+      }
+    });
+  }
+
+  Future<void> _checkForContent() async {
+    if (_webViewController == null || !mounted) return;
+
+    try {
+      // Check if page has actual content (not just white screen)
+      final hasContent = await _webViewController!.evaluateJavascript(source: '''
+        (function() {
+          const body = document.body;
+          if (!body) return false;
+          
+          // Check if iframe exists and has loaded
+          const iframe = document.getElementById('game-iframe');
+          if (iframe) {
+            // Check if iframe has src and try to detect content
+            const iframeSrc = iframe.src;
+            if (iframeSrc && iframeSrc !== 'about:blank') {
+              // Try to detect if iframe loaded (may fail due to CORS)
+              try {
+                const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+                if (iframeDoc && iframeDoc.body) {
+                  const hasCanvas = iframeDoc.querySelector('canvas') !== null;
+                  const hasUnity = typeof iframe.contentWindow.Unity !== 'undefined';
+                  if (hasCanvas || hasUnity || iframeDoc.body.children.length > 0) {
+                    return true;
+                  }
+                }
+              } catch (e) {
+                // CORS - can't access, but iframe src is set so assume loading
+                return true;
+              }
+            }
+          }
+          
+          // Check body content
+          const bodyText = body.innerText || body.textContent || '';
+          const bodyChildren = body.children.length;
+          
+          // If body has children or text, assume content exists
+          return bodyChildren > 1 || bodyText.trim().length > 10;
+        })();
+      ''');
+
+      print('Content check result: $hasContent');
+      
+      if (mounted) {
+        setState(() {
+          _hasContent = hasContent == true;
+          if (!_hasContent && !_isLoading && !_hasError) {
+            _showExternalBrowserOption = true;
+          }
+        });
+      }
+    } catch (e) {
+      print('Error checking content: $e');
+      if (mounted && !_isLoading && !_hasError) {
+        setState(() {
+          _showExternalBrowserOption = true;
+        });
+      }
+    }
+  }
+
   void _loadGame() {
     if (_webViewController != null) {
-      _webViewController!.loadData(
-        data: _buildIframeHtml(),
-        baseUrl: WebUri(widget.gameUrl),
-        mimeType: 'text/html',
-        encoding: 'utf-8',
-      );
+      final isIOS = !kIsWeb && Platform.isIOS;
+      
+      if (isIOS) {
+        // On iOS, load URL directly (like external browser) to avoid WebKit networking issues
+        print('iOS detected: Loading URL directly instead of iframe');
+        _webViewController!.loadUrl(
+          urlRequest: URLRequest(
+            url: WebUri(widget.gameUrl),
+          ),
+        );
+      } else {
+        // On Android, use iframe wrapper for better Unity WASM/GPU control
+        _webViewController!.loadData(
+          data: _buildIframeHtml(),
+          baseUrl: WebUri(widget.gameUrl),
+          mimeType: 'text/html',
+          encoding: 'utf-8',
+        );
+      }
     }
+  }
+
+  InAppWebViewSettings _buildWebViewSettings() {
+    final isIOS = !kIsWeb && Platform.isIOS;
+    final isAndroid = !kIsWeb && Platform.isAndroid;
+    
+    return InAppWebViewSettings(
+      javaScriptEnabled: true,
+      domStorageEnabled: true,
+      cacheEnabled: true,
+      cacheMode: CacheMode.LOAD_DEFAULT,
+      clearCache: false,
+      mediaPlaybackRequiresUserGesture: false,
+      // Platform-specific settings - useHybridComposition is Android-only
+      useHybridComposition: isAndroid,
+      useShouldOverrideUrlLoading: true,
+      allowsInlineMediaPlayback: true,
+      supportZoom: false,
+      transparentBackground: false,
+      // iOS-specific user agent for better compatibility
+      userAgent: isIOS
+          ? 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1'
+          : 'Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
+      // Unity WebGL specific settings
+      allowsLinkPreview: false,
+      disableHorizontalScroll: false,
+      disableVerticalScroll: false,
+      // Better WASM support
+      useOnDownloadStart: false,
+      useOnLoadResource: false,
+    );
   }
 
   String _buildIframeHtml() {
@@ -114,69 +271,97 @@ class _PlayGameScreenState extends State<PlayGameScreen> {
         (function() {
             const iframe = document.getElementById('game-iframe');
             const loading = document.getElementById('loading');
+            let hasNotifiedFlutter = false;
+            
+            function notifyFlutterLoaded(success, hasUnity) {
+                if (hasNotifiedFlutter) return;
+                hasNotifiedFlutter = true;
+                
+                // Notify Flutter that iframe loaded
+                try {
+                    if (window.flutter_inappwebview && window.flutter_inappwebview.callHandler) {
+                        window.flutter_inappwebview.callHandler('iframeLoaded', {
+                            success: success,
+                            hasUnity: hasUnity || false
+                        });
+                        console.log('Notified Flutter: iframe loaded');
+                    }
+                } catch (e) {
+                    console.log('Cannot call Flutter handler:', e);
+                }
+            }
+            
+            function hideLoading() {
+                if (loading) {
+                    loading.style.display = 'none';
+                }
+            }
             
             // Hide loading after iframe loads
-            iframe.addEventListener('load', function() {
-                console.log('Unity game iframe loaded');
-                
-                // Wait for Unity to initialize inside the iframe
-                setTimeout(function() {
-                    try {
-                        // Try to access iframe content (might fail due to CORS)
-                        const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
-                        const hasCanvas = iframeDoc.querySelector('canvas') !== null;
-                        const hasUnity = typeof iframe.contentWindow.Unity !== 'undefined' || 
-                                       typeof iframe.contentWindow.unityInstance !== 'undefined';
-                        
-                        console.log('Unity check inside iframe - hasCanvas:', hasCanvas, 'hasUnity:', hasUnity);
-                        
-                        if (hasCanvas || hasUnity) {
-                            console.log('Unity game detected inside iframe');
-                            if (loading) {
-                                loading.style.display = 'none';
-                            }
-                        } else {
-                            // Even if Unity not detected, hide loading after a delay
-                            console.log('Unity not detected but hiding loading anyway');
-                            setTimeout(function() {
-                                if (loading) {
-                                    loading.style.display = 'none';
-                                }
-                            }, 3000);
-                        }
-                    } catch (e) {
-                        // CORS might block access to iframe content
-                        console.log('Cannot access iframe content (CORS):', e);
-                        // Hide loading anyway after delay
-                        setTimeout(function() {
-                            if (loading) {
-                                loading.style.display = 'none';
-                            }
-                        }, 5000);
-                    }
+            if (iframe) {
+                iframe.addEventListener('load', function() {
+                    console.log('Unity game iframe loaded event fired');
                     
-                    // Notify parent that iframe loaded
-                    try {
-                        if (window.parent !== window) {
-                            window.parent.postMessage('unity-game-loaded', '*');
+                    // Wait for Unity to initialize inside the iframe
+                    setTimeout(function() {
+                        let hasUnity = false;
+                        try {
+                            // Try to access iframe content (might fail due to CORS)
+                            const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+                            const hasCanvas = iframeDoc.querySelector('canvas') !== null;
+                            hasUnity = typeof iframe.contentWindow.Unity !== 'undefined' || 
+                                       typeof iframe.contentWindow.unityInstance !== 'undefined';
+                            
+                            console.log('Unity check inside iframe - hasCanvas:', hasCanvas, 'hasUnity:', hasUnity);
+                            
+                            if (hasCanvas || hasUnity) {
+                                console.log('Unity game detected inside iframe');
+                                hideLoading();
+                            } else {
+                                // Even if Unity not detected, hide loading after a delay
+                                console.log('Unity not detected but hiding loading anyway');
+                                setTimeout(hideLoading, 3000);
+                            }
+                        } catch (e) {
+                            // CORS might block access to iframe content
+                            console.log('Cannot access iframe content (CORS):', e);
+                            // Hide loading anyway after delay
+                            setTimeout(hideLoading, 5000);
                         }
-                    } catch (e) {
-                        console.log('Cannot post message to parent:', e);
+                        
+                        // Notify Flutter
+                        notifyFlutterLoaded(true, hasUnity);
+                    }, 2000); // Wait 2 seconds for Unity to start loading
+                });
+                
+                // Handle errors
+                iframe.addEventListener('error', function(e) {
+                    console.error('Iframe load error:', e);
+                    if (loading) {
+                        loading.textContent = 'Failed to load game. Please try again.';
                     }
-                }, 2000); // Wait 2 seconds for Unity to start loading
-            });
+                    notifyFlutterLoaded(false, false);
+                });
+            }
             
-            // Handle errors
-            iframe.addEventListener('error', function(e) {
-                console.error('Iframe load error:', e);
-                if (loading) {
-                    loading.textContent = 'Failed to load game. Please try again.';
+            // Fallback: If iframe doesn't fire load event within 8 seconds, assume it loaded
+            setTimeout(function() {
+                if (!hasNotifiedFlutter && iframe) {
+                    console.log('Iframe load timeout - assuming loaded (fallback)');
+                    hideLoading();
+                    notifyFlutterLoaded(true, false);
                 }
-            });
+            }, 8000);
             
             // Listen for messages from Unity
             window.addEventListener('message', function(event) {
                 console.log('Received message from Unity:', event.data);
+                
+                // If we receive a message, the game is likely loaded
+                if (!hasNotifiedFlutter) {
+                    notifyFlutterLoaded(true, true);
+                }
+                
                 // Forward messages if needed
                 if (window.parent !== window) {
                     try {
@@ -199,6 +384,15 @@ class _PlayGameScreenState extends State<PlayGameScreen> {
     InAppWebViewController controller,
     WebUri? url,
   ) async {
+    final urlString = url?.toString() ?? '';
+    print('Load started: $urlString');
+    
+    // Ignore about:blank loads (iOS initialization)
+    if (urlString == 'about:blank') {
+      print('Ignoring about:blank load (iOS WebView initialization)');
+      return;
+    }
+    
     setState(() {
       _isLoading = true;
       _hasError = false;
@@ -206,55 +400,214 @@ class _PlayGameScreenState extends State<PlayGameScreen> {
     });
   }
 
+  void _setupJavaScriptHandlers(InAppWebViewController controller) {
+    // Listen for iframe loaded event from JavaScript (Android only)
+    controller.addJavaScriptHandler(
+      handlerName: 'iframeLoaded',
+      callback: (args) {
+        print('Iframe loaded callback received: $args');
+        if (mounted) {
+          final success = args.isNotEmpty && args[0] is Map 
+              ? (args[0] as Map)['success'] == true 
+              : false;
+          setState(() {
+            _isLoading = false;
+            _hasContent = success;
+            if (!success) {
+              _showExternalBrowserOption = true;
+            }
+          });
+          
+          // Verify content after a delay
+          if (success) {
+            Future.delayed(Duration(seconds: 2), () {
+              _checkForContent();
+            });
+          }
+        }
+      },
+    );
+    
+    // Listen for Unity game loaded messages
+    controller.addJavaScriptHandler(
+      handlerName: 'unityGameLoaded',
+      callback: (args) {
+        print('Unity game loaded via iframe');
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+            _hasContent = true;
+          });
+        }
+      },
+    );
+  }
+
+  Future<void> _onLoadStopDirect(
+    InAppWebViewController controller,
+    WebUri? url,
+  ) async {
+    final urlString = url?.toString() ?? '';
+    print('Page loaded (direct): $urlString');
+    
+    // Ignore about:blank (iOS initialization)
+    if (urlString == 'about:blank') {
+      print('Ignoring about:blank load stop (iOS WebView initialization)');
+      return;
+    }
+    
+    if (!mounted) return;
+
+    // For direct URL loading (iOS), check if content loaded
+    await Future.delayed(Duration(milliseconds: 1000));
+
+    try {
+      // Check if Unity game elements exist
+      final hasUnityContent = await controller.evaluateJavascript(source: '''
+        (function() {
+          // Check for Unity WebGL canvas
+          const canvas = document.querySelector('canvas');
+          const hasCanvas = canvas !== null;
+          
+          // Check for Unity instance
+          const hasUnity = typeof window.Unity !== 'undefined' || 
+                          typeof window.unityInstance !== 'undefined' ||
+                          typeof window.Module !== 'undefined';
+          
+          // Check for Unity loader script
+          const hasUnityScript = document.querySelector('script[src*="unity"], script[src*="loader"], script[src*=".wasm"]') !== null;
+          
+          return hasCanvas || hasUnity || hasUnityScript || document.body.children.length > 0;
+        })();
+      ''');
+
+      print('Unity content check: $hasUnityContent');
+
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _hasContent = hasUnityContent == true;
+          if (!_hasContent) {
+            // Check again after delay
+            Future.delayed(Duration(seconds: 3), () {
+              _checkForContent();
+            });
+          }
+        });
+      }
+    } catch (e) {
+      print('Error checking Unity content: $e');
+      // Hide loading anyway after delay
+      Future.delayed(Duration(seconds: 3), () {
+        if (mounted && _isLoading) {
+          setState(() {
+            _isLoading = false;
+          });
+          _checkForContent();
+        }
+      });
+    }
+  }
+
   Future<void> _onLoadStop(
     InAppWebViewController controller,
     WebUri? url,
   ) async {
     print('Page loaded: ${url?.toString()}');
+    
+    if (!mounted) return;
 
-    // Wait for iframe to load and Unity to initialize
-    await Future.delayed(Duration(seconds: 3));
+    // Wait a bit for the HTML to parse and iframe to start loading
+    await Future.delayed(Duration(milliseconds: 500));
 
-    // Check if iframe loaded
-    final iframeLoaded = await controller.evaluateJavascript(
-      source: 'document.getElementById("game-iframe") !== null;',
-    );
-    print('Iframe element exists: $iframeLoaded');
-
-    // Try to check if Unity is loading in iframe (might be blocked by CORS)
+    // Verify the page loaded correctly
     try {
-      final iframeSrc = await controller.evaluateJavascript(
-        source: 'document.getElementById("game-iframe")?.src || "not found";',
+      final bodyExists = await controller.evaluateJavascript(
+        source: 'document.body !== null;',
       );
-      print('Iframe src: $iframeSrc');
-    } catch (e) {
-      print('Error checking iframe src: $e');
-    }
+      print('Body exists: $bodyExists');
 
-    // Hide loading after delay - Unity should be loading
-    Future.delayed(Duration(seconds: 2), () {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    });
-  }
+      if (bodyExists == true) {
+        // Check if iframe element exists
+        final iframeExists = await controller.evaluateJavascript(
+          source: 'document.getElementById("game-iframe") !== null;',
+        );
+        print('Iframe element exists: $iframeExists');
 
-  void _onProgressChanged(InAppWebViewController controller, int progress) {
-    setState(() {
-      _progress = progress / 100;
-      // Wait a bit before hiding loader to ensure Unity has time to initialize
-      if (progress == 100) {
-        Future.delayed(Duration(seconds: 2), () {
-          if (mounted) {
+        // Inject JavaScript to notify when iframe loads
+        await controller.evaluateJavascript(source: '''
+          (function() {
+            const iframe = document.getElementById('game-iframe');
+            if (iframe) {
+              iframe.addEventListener('load', function() {
+                console.log('Iframe loaded successfully');
+                window.flutter_inappwebview.callHandler('iframeLoaded', {
+                  success: true
+                });
+              });
+              
+              iframe.addEventListener('error', function() {
+                console.log('Iframe load error');
+                window.flutter_inappwebview.callHandler('iframeLoaded', {
+                  success: false,
+                  error: 'Iframe failed to load'
+                });
+              });
+              
+              // Fallback: if iframe doesn't fire load event after 5 seconds, consider it loaded
+              setTimeout(function() {
+                console.log('Iframe load timeout - assuming loaded');
+                window.flutter_inappwebview.callHandler('iframeLoaded', {
+                  success: true,
+                  timeout: true
+                });
+              }, 5000);
+            }
+          })();
+        ''');
+
+        // Hide loading after a shorter delay for iOS
+        final isIOS = !kIsWeb && Platform.isIOS;
+        final delay = isIOS ? Duration(seconds: 3) : Duration(seconds: 5);
+        
+        Future.delayed(delay, () {
+          if (mounted && _isLoading) {
+            print('Auto-hiding loader after delay');
             setState(() {
               _isLoading = false;
             });
+            // Check for content after hiding loader
+            _checkForContent();
           }
         });
       }
+    } catch (e) {
+      print('Error in onLoadStop: $e');
+      // Even if there's an error, hide loading after delay
+      Future.delayed(Duration(seconds: 3), () {
+        if (mounted && _isLoading) {
+          setState(() {
+            _isLoading = false;
+          });
+        }
+      });
+    }
+  }
+
+  void _onProgressChanged(InAppWebViewController controller, int progress) {
+    if (!mounted) return;
+    
+    setState(() {
+      _progress = progress / 100;
     });
+    
+    // On iOS, when loading HTML data, progress might reach 100% quickly
+    // but we still need to wait for the iframe inside to load
+    if (progress == 100) {
+      // Don't hide immediately - wait for iframe to load
+      // The onLoadStop or JavaScript handler will handle hiding
+      print('Progress reached 100%, but waiting for iframe to load...');
+    }
   }
 
   bool _onConsoleMessage(
@@ -314,6 +667,39 @@ class _PlayGameScreenState extends State<PlayGameScreen> {
     return null; // Let other requests proceed normally
   }
 
+  Future<void> _openInExternalBrowser() async {
+    try {
+      final uri = Uri.parse(widget.gameUrl);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(
+          uri,
+          mode: LaunchMode.externalApplication,
+        );
+        // Optionally close this screen after opening in browser
+        // Navigator.of(context).pop();
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Cannot open this URL in browser'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      print('Error opening in external browser: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error opening browser: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   void _showExitDialog(BuildContext context) {
     showDialog(
       context: context,
@@ -368,6 +754,52 @@ class _PlayGameScreenState extends State<PlayGameScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isIOS = !kIsWeb && Platform.isIOS;
+    
+    // On iOS, show loading screen while opening external browser
+    if (isIOS) {
+      return Scaffold(
+        backgroundColor: AppColors.bgClr,
+        appBar: AppBar(
+          backgroundColor: AppColors.boxClr,
+          leading: IconButton(
+            icon: Icon(Icons.arrow_back, color: Colors.white),
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+          title: Text(
+            widget.gameTitle,
+            style: AppTextStyles.lufgaMedium.copyWith(
+              color: Colors.white,
+              fontSize: 18.sp,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              ThreeDotLoader(
+                color: AppColors.primaryColor,
+                size: 12.w,
+                spacing: 8.w,
+              ),
+              16.verticalSpace,
+              Text(
+                'Opening game in browser...',
+                style: AppTextStyles.medium.copyWith(
+                  color: Colors.white.withOpacity(0.7),
+                  fontSize: 14.sp,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    
+    // For Android and other platforms, show WebView
     return PopScope(
       canPop: false,
       onPopInvoked: (didPop) {
@@ -391,87 +823,111 @@ class _PlayGameScreenState extends State<PlayGameScreen> {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
-          actions: [],
+          actions: [
+            // External browser button - always available
+            IconButton(
+              icon: Icon(Icons.open_in_browser, color: Colors.white),
+              onPressed: () => _openInExternalBrowser(),
+              tooltip: 'Open in Browser',
+            ),
+          ],
         ),
         body: Stack(
           children: [
-            // InAppWebView - Use iframe wrapper for Unity WASM/GPU control
-            InAppWebView(
-              initialData: InAppWebViewInitialData(
-                data: _buildIframeHtml(),
-                baseUrl: WebUri(widget.gameUrl),
-                mimeType: 'text/html',
-                encoding: 'utf-8',
-              ),
-              initialSettings: InAppWebViewSettings(
-                javaScriptEnabled: true,
-                domStorageEnabled: true,
-                cacheEnabled: true,
-                cacheMode: CacheMode.LOAD_DEFAULT,
-                clearCache: false,
-                mediaPlaybackRequiresUserGesture: false,
-                useHybridComposition: true,
-                useShouldOverrideUrlLoading: true,
-                allowsInlineMediaPlayback: true,
-                supportZoom: false,
-                transparentBackground: false,
-                userAgent:
-                    'Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
-                // Unity WebGL specific settings
-                allowsLinkPreview: false,
-                disableHorizontalScroll: false,
-                disableVerticalScroll: false,
-                // Better WASM support
-                useOnDownloadStart: false,
-                useOnLoadResource: false,
-              ),
-              onWebViewCreated: (controller) {
-                _webViewController = controller;
-                // Listen for messages from iframe
-                controller.addJavaScriptHandler(
-                  handlerName: 'unityGameLoaded',
-                  callback: (args) {
-                    print('Unity game loaded via iframe');
-                    setState(() {
-                      _isLoading = false;
-                    });
+            // InAppWebView - Platform-specific loading strategy
+            Builder(
+              builder: (context) {
+                final isIOS = !kIsWeb && Platform.isIOS;
+                
+                // On iOS, load URL after WebView is created to avoid WebKit networking initialization issues
+                if (isIOS) {
+                  return InAppWebView(
+                    // Load blank page first, then load game URL after WebView initializes
+                    initialUrlRequest: URLRequest(
+                      url: WebUri('about:blank'),
+                    ),
+                    initialSettings: _buildWebViewSettings(),
+                    onWebViewCreated: (controller) {
+                      _webViewController = controller;
+                      _setupJavaScriptHandlers(controller);
+                      
+                      // Load game URL after WebView is fully initialized (fixes WebKit networking error)
+                      Future.delayed(Duration(milliseconds: 500), () {
+                        if (mounted && _webViewController != null) {
+                          print('iOS: Loading game URL after WebView initialization');
+                          _webViewController!.loadUrl(
+                            urlRequest: URLRequest(
+                              url: WebUri(widget.gameUrl),
+                            ),
+                          );
+                        }
+                      });
+                    },
+                    onLoadStart: _onLoadStart,
+                    onLoadStop: _onLoadStopDirect,
+                    onConsoleMessage: _onConsoleMessage,
+                    onProgressChanged: _onProgressChanged,
+                    onReceivedError: _onReceivedError,
+                    shouldInterceptRequest: _shouldInterceptRequest,
+                    onReceivedHttpError: (controller, request, response) {
+                      final url = request.url.toString();
+                      
+                      // Ignore about:blank errors
+                      if (url == 'about:blank') return;
+                      
+                      final isWasm = url.endsWith('.wasm') || url.contains('.wasm');
+                      final statusCode = response.statusCode;
+                      
+                      if (statusCode != null && statusCode >= 400 && !isWasm) {
+                        final isForMainFrame = request.isForMainFrame ?? false;
+                        if (isForMainFrame) {
+                          setState(() {
+                            _isLoading = false;
+                            _hasError = true;
+                          });
+                          print('HTTP error (main frame): $statusCode');
+                        }
+                      }
+                    },
+                  );
+                }
+                
+                // On Android, use iframe wrapper for Unity WASM/GPU control
+                return InAppWebView(
+                  initialData: InAppWebViewInitialData(
+                    data: _buildIframeHtml(),
+                    baseUrl: WebUri(widget.gameUrl),
+                    mimeType: 'text/html',
+                    encoding: 'utf-8',
+                  ),
+                  initialSettings: _buildWebViewSettings(),
+                  onWebViewCreated: (controller) {
+                    _webViewController = controller;
+                    _setupJavaScriptHandlers(controller);
+                  },
+                  onLoadStart: _onLoadStart,
+                  onLoadStop: _onLoadStop,
+                  onConsoleMessage: _onConsoleMessage,
+                  onProgressChanged: _onProgressChanged,
+                  onReceivedError: _onReceivedError,
+                  shouldInterceptRequest: _shouldInterceptRequest,
+                  onReceivedHttpError: (controller, request, response) {
+                    final url = request.url.toString();
+                    final isWasm = url.endsWith('.wasm') || url.contains('.wasm');
+                    final statusCode = response.statusCode;
+                    
+                    if (statusCode != null && statusCode >= 400 && !isWasm) {
+                      final isForMainFrame = request.isForMainFrame ?? false;
+                      if (isForMainFrame) {
+                        setState(() {
+                          _isLoading = false;
+                          _hasError = true;
+                        });
+                        print('HTTP error (main frame): $statusCode');
+                      }
+                    }
                   },
                 );
-              },
-              onLoadStart: _onLoadStart,
-              onLoadStop: _onLoadStop,
-              onConsoleMessage: (controller, message) {
-                // Handle iframe messages
-                if (message.message.contains('unity-game-loaded')) {
-                  setState(() {
-                    _isLoading = false;
-                  });
-                }
-                _onConsoleMessage(controller, message);
-              },
-              onProgressChanged: _onProgressChanged,
-              onReceivedError: _onReceivedError,
-              shouldInterceptRequest: _shouldInterceptRequest,
-              onReceivedHttpError: (controller, request, response) {
-                // Don't treat WASM-related errors as fatal
-                final url = request.url.toString();
-                final isWasm = url.endsWith('.wasm') || url.contains('.wasm');
-
-                final statusCode = response.statusCode;
-                // Only show error for critical HTTP errors that aren't WASM-related
-                if (statusCode != null && statusCode >= 400 && !isWasm) {
-                  // Check if it's a main frame error
-                  final isForMainFrame = request.isForMainFrame ?? false;
-                  if (isForMainFrame) {
-                    setState(() {
-                      _isLoading = false;
-                      _hasError = true;
-                    });
-                    print('HTTP error (main frame): $statusCode');
-                  } else {
-                    print('HTTP error (resource): $statusCode for $url');
-                  }
-                }
               },
             ),
 
@@ -514,6 +970,95 @@ class _PlayGameScreenState extends State<PlayGameScreen> {
                 ),
               ),
 
+            // External Browser Banner (shown when content not detected)
+            if (_showExternalBrowserOption && !_isLoading && !_hasError)
+              SafeArea(
+                bottom: false,
+                child: Container(
+                  width: double.infinity,
+                  padding: EdgeInsets.all(16.w),
+                  decoration: BoxDecoration(
+                    color: AppColors.boxClr,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.3),
+                        blurRadius: 8,
+                        offset: Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.warning_amber_rounded,
+                              color: Colors.orange, size: 24.sp),
+                          12.horizontalSpace,
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Game may not be loading properly',
+                                  style: AppTextStyles.medium.copyWith(
+                                    color: Colors.white,
+                                    fontSize: 14.sp,
+                                  ),
+                                ),
+                                4.verticalSpace,
+                                Text(
+                                  'Try opening in external browser for better compatibility',
+                                  style: AppTextStyles.regular.copyWith(
+                                    color: Colors.white.withOpacity(0.7),
+                                    fontSize: 12.sp,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            icon: Icon(Icons.close, color: Colors.white, size: 20.sp),
+                            onPressed: () {
+                              setState(() {
+                                _showExternalBrowserOption = false;
+                              });
+                            },
+                            padding: EdgeInsets.zero,
+                            constraints: BoxConstraints(),
+                          ),
+                        ],
+                      ),
+                      12.verticalSpace,
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: _openInExternalBrowser,
+                          icon: Icon(Icons.open_in_browser, size: 18.sp),
+                          label: Text(
+                            'Open in Browser',
+                            style: AppTextStyles.medium.copyWith(
+                              color: Colors.black,
+                              fontSize: 14.sp,
+                            ),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primaryColor,
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 24.w,
+                              vertical: 12.h,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8.r),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
             // Error State
             if (_hasError && !_isLoading)
               Container(
@@ -546,15 +1091,7 @@ class _PlayGameScreenState extends State<PlayGameScreen> {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           ElevatedButton(
-                            onPressed: () async {
-                              final uri = Uri.parse(widget.gameUrl);
-                              if (await canLaunchUrl(uri)) {
-                                await launchUrl(
-                                  uri,
-                                  mode: LaunchMode.externalApplication,
-                                );
-                              }
-                            },
+                            onPressed: _openInExternalBrowser,
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppColors.primaryColor,
                               padding: EdgeInsets.symmetric(
