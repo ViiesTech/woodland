@@ -139,9 +139,10 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
 
         if (mounted) {
           await _checkOwnership();
+          await _checkOwnership();
           CustomToast.showSuccess(
             context,
-            'Purchase successful! Book added to your library.',
+            'Purchase successful! "${_book.title}" added to your library.',
           );
         }
       } else {
@@ -636,10 +637,44 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
                                   } else {
                                     // Show purchase button if not owned
                                     if (_isPurchasing) {
-                                      return Center(
-                                        child: CircularProgressIndicator(
-                                          color: AppColors.primaryColor,
-                                        ),
+                                      return Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          SizedBox(
+                                            width: 24.w,
+                                            height: 24.w,
+                                            child: CircularProgressIndicator(
+                                              color: AppColors.primaryColor,
+                                              strokeWidth: 2,
+                                            ),
+                                          ),
+                                          8.horizontalSpace,
+                                          Text(
+                                            'Processing...',
+                                            style: AppTextStyles.regular
+                                                .copyWith(
+                                                  fontSize: 14.sp,
+                                                  color: Colors.grey,
+                                                ),
+                                          ),
+                                          8.horizontalSpace,
+                                          TextButton(
+                                            onPressed: () {
+                                              setState(() {
+                                                _isPurchasing = false;
+                                              });
+                                            },
+                                            child: Text(
+                                              'Cancel',
+                                              style: AppTextStyles.regular
+                                                  .copyWith(
+                                                    fontSize: 14.sp,
+                                                    color: Colors.red,
+                                                  ),
+                                            ),
+                                          ),
+                                        ],
                                       );
                                     }
                                     return GestureDetector(

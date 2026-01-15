@@ -1,17 +1,19 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/material.dart'; // Required for WidgetsBindingObserver
 import 'package:url_launcher/url_launcher.dart';
 import 'package:http/http.dart' as http;
 import 'package:app_links/app_links.dart';
 
 class StripeService {
+  // ... existing constants ...
   // Stripe live publishable key
   static const String stripeTestPublishableKey =
       'pk_live_51SG0n8DpfvqzBzFilSGwrGzKH18BSrZRlJu97UZ98m1O1q7fSsUJpNDNXVamqTAKEkEYJH4pjY4Jr80jBiq6STq200ZkXuVe03';
 
-  // Use 10.0.2.2 for Android emulator to access localhost
-  static const String backendUrl = 'http://10.0.2.2:3004';
+  // Use computer's local IP for physical device (check ipconfig)
+  static const String backendUrl = 'https://apps.codefied.co/woodland';
 
   /// Start Stripe payment flow
   /// 1. Create Checkout Session
@@ -27,6 +29,7 @@ class StripeService {
     final appLinks = AppLinks();
     StreamSubscription<Uri>? linkSubscription;
     final completer = Completer<Map<String, dynamic>?>();
+    _PaymentLifecycleObserver? observer;
 
     try {
       // 1. Setup Deep Link Listener
@@ -97,18 +100,54 @@ class StripeService {
         throw Exception('Could not launch payment URL');
       }
 
-      // 4. Wait for Deep Link or Timeout (e.g., 5 minutes)
-      // We return the future so the caller waits until the deep link triggers the completer
-      // OR the user manually goes back to the app (which we can't easily detect as "cancel" unless they hit the specific link)
-      // For a better UX, we might want to let the user "Cancel" from the UI if they get stuck.
-      // However, for this implementation, we wait for the link.
+      // 4. Wait for Deep Link or Timeout
+      // We also listen for App Lifecycle changes to detect manual return
+      observer = _PaymentLifecycleObserver(completer);
+      WidgetsBinding.instance.addObserver(observer!);
 
       return await completer.future;
+    } on TimeoutException catch (_) {
+      print('❌ Timeout connecting to backend');
+      return {
+        'success': false,
+        'error':
+            'Connection timed out. Ensure server is running at $backendUrl',
+      };
+    } on http.ClientException catch (e) {
+      print('❌ Network error: $e');
+      return {
+        'success': false,
+        'error': 'Network error: Cannot reach server. Check IP/Port.',
+      };
     } catch (e) {
-      print('Payment Error: $e');
+      print('❌ Payment Error: $e');
       return {'success': false, 'error': e.toString()};
     } finally {
       linkSubscription?.cancel();
+      if (observer != null) {
+        WidgetsBinding.instance.removeObserver(observer!);
+      }
+    }
+  }
+}
+
+/// Helper class to detect when user manually returns to the app
+class _PaymentLifecycleObserver extends WidgetsBindingObserver {
+  final Completer<Map<String, dynamic>?> completer;
+
+  _PaymentLifecycleObserver(this.completer);
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // User returned to app.
+      // If payment was successful, the Deep Link should have fired (or will fire very soon).
+      // We give it a short buffer. If not completed by then, assume cancel.
+      Future.delayed(const Duration(seconds: 2), () {
+        if (!completer.isCompleted) {
+          completer.complete({'success': false, 'error': 'Payment cancelled'});
+        }
+      });
     }
   }
 }
