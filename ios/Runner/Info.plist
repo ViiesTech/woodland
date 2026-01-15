@@ -34,13 +34,11 @@
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>This app needs access to your photo library to allow you to select and upload photos.</string>
+	<string>This app needs photo library access to let you select and upload photos for your profile, books, and games.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>This app needs access to your camera to allow you to take and upload photos.</string>
-	<key>NSMicrophoneUsageDescription</key>
-	<string>This app needs access to your microphone for video recording.</string>
+	<string>This app needs camera access to let you capture and upload photos for your profile, books, and games.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>This app needs access to your photo library to save photos.</string>
+	<string>This app needs photo library access to save photos to your device.</string>
 	<key>UIMainStoryboardFile</key>
 	<string>Main</string>
 	<key>UISupportedInterfaceOrientations</key>
