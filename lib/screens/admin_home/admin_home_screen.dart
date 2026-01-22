@@ -165,12 +165,15 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                 Row(
                   children: [
                     Expanded(
-                      child: _buildStatCard(
-                        'Total Users',
-                        totalUsers.toString(),
-                        Icons.people_outline,
-                        Colors.blue,
-                        isLoading: isLoadingStats,
+                      child: GestureDetector(
+                        onTap: _showAllUsersDialog,
+                        child: _buildStatCard(
+                          'Total Users',
+                          totalUsers.toString(),
+                          Icons.people_outline,
+                          Colors.blue,
+                          isLoading: isLoadingStats,
+                        ),
                       ),
                     ),
                     12.horizontalSpace,
@@ -582,5 +585,379 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       return parts[0].substring(0, parts[0].length >= 2 ? 2 : 1).toUpperCase();
     }
     return 'A';
+  }
+
+  Future<void> _showAllUsersDialog() async {
+    // Show loading dialog first
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => Center(
+        child: Container(
+          padding: EdgeInsets.all(20.w),
+          decoration: BoxDecoration(
+            color: AppColors.boxClr,
+            borderRadius: BorderRadius.circular(16.r),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(color: AppColors.primaryColor),
+              16.verticalSpace,
+              Text(
+                'Loading users...',
+                style: AppTextStyles.regular.copyWith(
+                  color: Colors.white,
+                  fontSize: 14.sp,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    try {
+      // Fetch all users (excluding admins)
+      QuerySnapshot usersSnapshot;
+      try {
+        usersSnapshot = await _firestore
+            .collection('users')
+            .where('role', isNotEqualTo: 'admin')
+            .orderBy('createdAt', descending: true)
+            .get();
+      } catch (e) {
+        // If orderBy fails (missing index), fetch without orderBy
+        print('OrderBy failed, fetching without order: $e');
+        usersSnapshot = await _firestore
+            .collection('users')
+            .where('role', isNotEqualTo: 'admin')
+            .get();
+      }
+
+      // Close loading dialog
+      if (mounted) Navigator.pop(context);
+
+      // Convert to UserModel list and sort manually if needed
+      List<UserModel> users = usersSnapshot.docs.map((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        // Handle Timestamp conversion if needed
+        if (data['createdAt'] is Timestamp) {
+          data['createdAt'] = (data['createdAt'] as Timestamp).millisecondsSinceEpoch;
+        }
+        return UserModel.fromFirestore(doc.id, data);
+      }).toList();
+
+      // Sort by createdAt descending if not already sorted
+      users.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+      // Show users dialog
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => _buildUsersDialog(users),
+        );
+      }
+    } catch (e) {
+      // Close loading dialog
+      if (mounted) Navigator.pop(context);
+
+      // Show error dialog
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            backgroundColor: AppColors.boxClr,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16.r),
+            ),
+            title: Text(
+              'Error',
+              style: AppTextStyles.lufgaLarge.copyWith(
+                color: Colors.white,
+                fontSize: 18.sp,
+              ),
+            ),
+            content: Text(
+              'Failed to load users: $e',
+              style: AppTextStyles.regular.copyWith(
+                color: Colors.white.withOpacity(0.7),
+                fontSize: 14.sp,
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text(
+                  'OK',
+                  style: TextStyle(
+                    color: AppColors.primaryColor,
+                    fontSize: 14.sp,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      }
+    }
+  }
+
+  Widget _buildUsersDialog(List<UserModel> users) {
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 24.h),
+      child: Container(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.8,
+        ),
+        decoration: BoxDecoration(
+          color: AppColors.boxClr,
+          borderRadius: BorderRadius.circular(16.r),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Header
+            Padding(
+              padding: EdgeInsets.all(20.w),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'All Users (${users.length})',
+                    style: AppTextStyles.lufgaLarge.copyWith(
+                      color: Colors.white,
+                      fontSize: 20.sp,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: Icon(
+                      Icons.close,
+                      color: Colors.white,
+                      size: 24.sp,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Divider(color: Colors.white.withOpacity(0.1), height: 1),
+            // Users List
+            Flexible(
+              child: users.isEmpty
+                  ? Padding(
+                      padding: EdgeInsets.all(40.w),
+                      child: Center(
+                        child: Text(
+                          'No users found',
+                          style: AppTextStyles.regular.copyWith(
+                            color: Colors.white.withOpacity(0.6),
+                            fontSize: 14.sp,
+                          ),
+                        ),
+                      ),
+                    )
+                  : ListView.separated(
+                      shrinkWrap: true,
+                      padding: EdgeInsets.symmetric(horizontal: 16.w),
+                      itemCount: users.length,
+                      separatorBuilder: (context, index) =>
+                          Divider(color: Colors.white.withOpacity(0.1), height: 1),
+                      itemBuilder: (context, index) {
+                        final user = users[index];
+                        return _buildUserListItem(user);
+                      },
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildUserListItem(UserModel user) {
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: 12.h),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Avatar
+          Container(
+            width: 50.w,
+            height: 50.w,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  AppColors.primaryColor,
+                  AppColors.primaryColor.withOpacity(0.7),
+                ],
+              ),
+            ),
+            child: user.profileImageUrl != null &&
+                    user.profileImageUrl!.isNotEmpty
+                ? ClipOval(
+                    child: Image.network(
+                      user.profileImageUrl!,
+                      width: 50.w,
+                      height: 50.w,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return Center(
+                          child: Text(
+                            _getInitials(user.name),
+                            style: AppTextStyles.lufgaMedium.copyWith(
+                              color: Colors.white,
+                              fontSize: 18.sp,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  )
+                : Center(
+                    child: Text(
+                      _getInitials(user.name),
+                      style: AppTextStyles.lufgaMedium.copyWith(
+                        color: Colors.white,
+                        fontSize: 18.sp,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+          ),
+          12.horizontalSpace,
+          // User Details
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  user.name,
+                  style: AppTextStyles.lufgaMedium.copyWith(
+                    color: Colors.white,
+                    fontSize: 16.sp,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                4.verticalSpace,
+                Row(
+                  children: [
+                    Icon(
+                      Icons.email_outlined,
+                      size: 14.sp,
+                      color: Colors.white.withOpacity(0.6),
+                    ),
+                    4.horizontalSpace,
+                    Expanded(
+                      child: Text(
+                        user.email,
+                        style: AppTextStyles.regular.copyWith(
+                          color: Colors.white.withOpacity(0.7),
+                          fontSize: 12.sp,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+                if (user.phoneNumber != null && user.phoneNumber!.isNotEmpty) ...[
+                  4.verticalSpace,
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.phone_outlined,
+                        size: 14.sp,
+                        color: Colors.white.withOpacity(0.6),
+                      ),
+                      4.horizontalSpace,
+                      Text(
+                        user.phoneNumber!,
+                        style: AppTextStyles.regular.copyWith(
+                          color: Colors.white.withOpacity(0.7),
+                          fontSize: 12.sp,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+                4.verticalSpace,
+                Row(
+                  children: [
+                    Container(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 8.w,
+                        vertical: 4.h,
+                      ),
+                      decoration: BoxDecoration(
+                        color: user.role == 'admin'
+                            ? Colors.red.withOpacity(0.2)
+                            : Colors.blue.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(8.r),
+                        border: Border.all(
+                          color: user.role == 'admin'
+                              ? Colors.red
+                              : Colors.blue,
+                          width: 1,
+                        ),
+                      ),
+                      child: Text(
+                        user.role.toUpperCase(),
+                        style: AppTextStyles.regular.copyWith(
+                          color: user.role == 'admin' ? Colors.red : Colors.blue,
+                          fontSize: 10.sp,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    8.horizontalSpace,
+                    Icon(
+                      Icons.calendar_today_outlined,
+                      size: 12.sp,
+                      color: Colors.white.withOpacity(0.5),
+                    ),
+                    4.horizontalSpace,
+                    Text(
+                      _formatDate(user.createdAt),
+                      style: AppTextStyles.regular.copyWith(
+                        color: Colors.white.withOpacity(0.5),
+                        fontSize: 11.sp,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatDate(DateTime date) {
+    final now = DateTime.now();
+    final difference = now.difference(date);
+
+    if (difference.inDays == 0) {
+      return 'Today';
+    } else if (difference.inDays == 1) {
+      return 'Yesterday';
+    } else if (difference.inDays < 7) {
+      return '${difference.inDays} days ago';
+    } else if (difference.inDays < 30) {
+      final weeks = (difference.inDays / 7).floor();
+      return '$weeks ${weeks == 1 ? 'week' : 'weeks'} ago';
+    } else if (difference.inDays < 365) {
+      final months = (difference.inDays / 30).floor();
+      return '$months ${months == 1 ? 'month' : 'months'} ago';
+    } else {
+      final years = (difference.inDays / 365).floor();
+      return '$years ${years == 1 ? 'year' : 'years'} ago';
+    }
   }
 }

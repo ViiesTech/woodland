@@ -13,8 +13,13 @@ class StripeService {
       'pk_live_51SG0n8DpfvqzBzFilSGwrGzKH18BSrZRlJu97UZ98m1O1q7fSsUJpNDNXVamqTAKEkEYJH4pjY4Jr80jBiq6STq200ZkXuVe03';
   // 'pk_test_51QkTfNEtXkWvOEBqD21BzP7lB1MbpJvo7ijAlGBctZo6qNlLCzfqUtGy9wgGS2jf04swfAYja3VGQm3IcZzm504400S1R4yg1f';
 
-  // Use computer's local IP for physical device (check ipconfig)
-  static const String backendUrl = 'https://apps.codefied.co/woodland';
+  // Production backend URL
+  static const String backendUrl = 'https://apps.codefied.co/woodland/prod';
+  
+  // Local development URL (for testing on physical device)
+  // To find your local IP on macOS: run `ipconfig getifaddr en0` in terminal
+  // Make sure your phone and computer are on the same WiFi network
+  // static const String backendUrl = 'http://192.168.100.67:3004';
 
   /// Start Stripe payment flow
   /// 1. Create Checkout Session

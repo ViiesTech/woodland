@@ -64,8 +64,8 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
         );
         if (mounted) {
           setState(() {
-            // Only mark as owned if explicitly in purchased list OR price is 0 (free)
-            _isOwned = isOwned || _book.price == 0;
+            // Only mark as owned if explicitly in purchased list (not automatically for free books)
+            _isOwned = isOwned;
             _isCheckingOwnership = false;
           });
         }
@@ -73,8 +73,8 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
         print('Error checking ownership: $e');
         if (mounted) {
           setState(() {
-            // On error, only consider owned if price is 0
-            _isOwned = _book.price == 0;
+            // On error, don't assume owned
+            _isOwned = false;
             _isCheckingOwnership = false;
           });
         }
@@ -82,8 +82,8 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
     } else {
       if (mounted) {
         setState(() {
-          // Not logged in, only free books are accessible
-          _isOwned = _book.price == 0;
+          // Not logged in, don't assume owned
+          _isOwned = false;
           _isCheckingOwnership = false;
         });
       }
@@ -104,6 +104,13 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
       return;
     }
 
+    // If book is free (price == 0), show confirmation dialog
+    if (_book.price == 0) {
+      _showFreeBookClaimDialog();
+      return;
+    }
+
+    // For paid books, use Stripe payment flow
     setState(() {
       _isPurchasing = true;
     });
@@ -155,6 +162,98 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
     } catch (e) {
       if (mounted) {
         CustomToast.showError(context, 'Error processing purchase: $e');
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isPurchasing = false;
+        });
+      }
+    }
+  }
+
+  void _showFreeBookClaimDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          backgroundColor: AppColors.boxClr,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16.r),
+          ),
+          title: Text(
+            'Claim Free Book',
+            style: AppTextStyles.lufgaLarge.copyWith(
+              color: Colors.white,
+              fontSize: 20.sp,
+            ),
+          ),
+          content: Text(
+            'Would you like to add "${_book.title}" to your library for free?',
+            style: AppTextStyles.lufgaMedium.copyWith(
+              color: Colors.white.withOpacity(0.7),
+              fontSize: 14.sp,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: Text(
+                'Cancel',
+                style: TextStyle(color: Colors.grey, fontSize: 14.sp),
+              ),
+            ),
+            TextButton(
+              onPressed: () async {
+                Navigator.pop(dialogContext);
+                await _claimFreeBook();
+              },
+              child: Text(
+                'Claim',
+                style: TextStyle(
+                  color: AppColors.primaryColor,
+                  fontSize: 14.sp,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _claimFreeBook() async {
+    if (_currentUserId == null) {
+      CustomToast.showError(context, 'Please login to claim books');
+      return;
+    }
+
+    setState(() {
+      _isPurchasing = true;
+    });
+
+    try {
+      // Add free book to purchased books in Firebase
+      await PurchaseService.addPurchasedBook(
+        _currentUserId!,
+        _book.id,
+        paymentId: 'free_${DateTime.now().millisecondsSinceEpoch}',
+        transactionId: null,
+        amount: 0.0,
+        purchaseDate: DateTime.now(),
+      );
+
+      if (mounted) {
+        await _checkOwnership();
+        CustomToast.showSuccess(
+          context,
+          'Book claimed successfully! "${_book.title}" added to your library.',
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        CustomToast.showError(context, 'Error claiming book: $e');
       }
     } finally {
       if (mounted) {
@@ -677,12 +776,16 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
                                         ],
                                       );
                                     }
+                                    // Show "Free Claim" for free books, "Purchase" for paid books
                                     return GestureDetector(
                                       onTap: _handlePurchase,
                                       child: _buildActionButton(
-                                        icon: Icons.shopping_cart,
-                                        text:
-                                            'Purchase - \$${(_book.price).toStringAsFixed(2)}',
+                                        icon: _book.price == 0
+                                            ? Icons.card_giftcard
+                                            : Icons.shopping_cart,
+                                        text: _book.price == 0
+                                            ? 'Free Claim'
+                                            : 'Purchase - \$${(_book.price).toStringAsFixed(2)}',
                                       ),
                                     );
                                   }
