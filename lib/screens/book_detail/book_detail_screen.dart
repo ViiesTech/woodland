@@ -1,9 +1,11 @@
 import 'dart:ui';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:the_woodlands_series/Components/resource/app_routers.dart';
 import 'package:the_woodlands_series/components/resource/size_constants.dart';
 import 'package:the_woodlands_series/admin_panel/models/book_model.dart';
@@ -22,6 +24,7 @@ import '../../services/bookmark_service.dart';
 import '../../services/viewed_books_service.dart';
 import '../../services/purchase_service.dart';
 import '../../services/stripe_service.dart';
+import '../../services/apple_iap_service.dart';
 
 class BookDetailScreen extends StatefulWidget {
   final BookModel book;
@@ -42,6 +45,11 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
   bool _isOwned = false;
   bool _isCheckingOwnership = true;
 
+  // Apple IAP state
+  ProductDetails? _iapProduct;
+  bool _isLoadingProduct = false;
+  bool _iapInitialized = false;
+
   @override
   void initState() {
     super.initState();
@@ -51,6 +59,124 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
     _markBookAsViewed();
     _loadSimilarBooks();
     _checkOwnership();
+    _initializeIAP();
+  }
+
+  @override
+  void dispose() {
+    AppleIAPService.dispose();
+    super.dispose();
+  }
+
+  /// Initialize Apple IAP for iOS
+  Future<void> _initializeIAP() async {
+    if (!Platform.isIOS) return;
+
+    try {
+      final initialized = await AppleIAPService.initialize();
+      if (mounted) {
+        setState(() {
+          _iapInitialized = initialized;
+        });
+      }
+
+      if (initialized) {
+        // Set up purchase callbacks
+        AppleIAPService.onPurchaseComplete = _handleIAPPurchaseComplete;
+        AppleIAPService.onPurchaseError = _handleIAPPurchaseError;
+
+        // Load product details
+        await _loadIAPProduct();
+      }
+    } catch (e) {
+      print('Error initializing IAP: $e');
+    }
+  }
+
+  /// Load IAP product details for this book
+  Future<void> _loadIAPProduct() async {
+    if (!Platform.isIOS || _book.price == 0) return;
+
+    setState(() {
+      _isLoadingProduct = true;
+    });
+
+    try {
+      // Use price tier instead of book ID
+      final productId = AppleIAPService.priceToProductId(_book.price);
+      final product = await AppleIAPService.getProduct(productId);
+
+      if (mounted) {
+        setState(() {
+          _iapProduct = product;
+          _isLoadingProduct = false;
+        });
+      }
+
+      if (product == null) {
+        print('⚠️ Product not found in App Store: $productId');
+        print('Make sure you created price tier products in App Store Connect');
+      }
+    } catch (e) {
+      print('Error loading IAP product: $e');
+      if (mounted) {
+        setState(() {
+          _isLoadingProduct = false;
+        });
+      }
+    }
+  }
+
+  /// Handle successful IAP purchase
+  void _handleIAPPurchaseComplete(PurchaseDetails purchase) async {
+    if (!mounted) return;
+
+    try {
+      // Get receipt data
+      final receipt = await AppleIAPService.getReceiptData(purchase);
+
+      // Add to Firebase
+      await PurchaseService.addPurchasedBookFromIAP(
+        _currentUserId!,
+        _book.id,
+        transactionId: purchase.purchaseID ?? 'unknown',
+        receipt: receipt,
+        amount: _book.price,
+        purchaseDate: DateTime.now(),
+      );
+
+      if (mounted) {
+        await _checkOwnership();
+        CustomToast.showSuccess(
+          context,
+          'Purchase successful! "${_book.title}" added to your library.',
+        );
+      }
+    } catch (e) {
+      print('Error processing IAP purchase: $e');
+      if (mounted) {
+        CustomToast.showError(context, 'Error processing purchase: $e');
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isPurchasing = false;
+        });
+      }
+    }
+  }
+
+  /// Handle IAP purchase error
+  void _handleIAPPurchaseError(String error) {
+    if (!mounted) return;
+
+    setState(() {
+      _isPurchasing = false;
+    });
+
+    if (error != 'Purchase canceled') {
+      CustomToast.showError(context, error);
+    }
   }
 
   Future<void> _checkOwnership() async {
@@ -110,13 +236,33 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
       return;
     }
 
-    // For paid books, use Stripe payment flow
+    // For paid books, check platform
     setState(() {
       _isPurchasing = true;
     });
 
     try {
-      // Start Stripe payment flow via external browser
+      // iOS: Use Apple In-App Purchase
+      if (Platform.isIOS) {
+        if (!_iapInitialized) {
+          throw Exception('Apple IAP not initialized');
+        }
+
+        if (_iapProduct == null) {
+          throw Exception(
+            'Product not found in App Store. Please make sure you created price tier: ${AppleIAPService.priceToProductId(_book.price)}',
+          );
+        }
+
+        // Start IAP purchase flow using price tier
+        await AppleIAPService.purchaseBookByPrice(_book.price);
+
+        // Purchase result will be handled by callbacks
+        // _handleIAPPurchaseComplete or _handleIAPPurchaseError
+        return;
+      }
+
+      // Android/Web: Use Stripe payment flow
       final paymentResult = await StripeService.startPayment(
         bookId: _book.id,
         bookTitle: _book.title,
@@ -133,7 +279,6 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
         final transactionId = paymentResult['transactionId'] as String?;
         final amount = paymentResult['amount'] as double?;
 
-        // Ideally verification should happen on backend callback, but for this flow:
         await PurchaseService.addPurchasedBook(
           _currentUserId!,
           _book.id,
@@ -146,14 +291,12 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
 
         if (mounted) {
           await _checkOwnership();
-          await _checkOwnership();
           CustomToast.showSuccess(
             context,
             'Purchase successful! "${_book.title}" added to your library.',
           );
         }
       } else {
-        // Payment failed or cancelled
         final error = paymentResult?['error'] as String? ?? 'Payment cancelled';
         if (mounted) {
           CustomToast.showError(context, error);
@@ -785,7 +928,7 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
                                             : Icons.shopping_cart,
                                         text: _book.price == 0
                                             ? 'Free Claim'
-                                            : 'Purchase - \$${(_book.price).toStringAsFixed(2)}',
+                                            : _getPurchaseButtonText(),
                                       ),
                                     );
                                   }
@@ -1393,5 +1536,16 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
         ],
       ),
     );
+  }
+
+  /// Get purchase button text with appropriate pricing
+  String _getPurchaseButtonText() {
+    // On iOS, show App Store price if available
+    if (Platform.isIOS && _iapProduct != null) {
+      return 'Purchase - ${_iapProduct!.price}';
+    }
+
+    // Fallback to book price
+    return 'Purchase - \$${(_book.price).toStringAsFixed(2)}';
   }
 }

@@ -36,55 +36,60 @@ class PurchaseService {
 
   /// Get stream of user's purchased books (returns book IDs)
   static Stream<List<String>> getPurchasedBooksStream(String userId) {
-    return _firestore
-        .collection(_usersCollection)
-        .doc(userId)
-        .snapshots()
-        .map((snapshot) {
+    return _firestore.collection(_usersCollection).doc(userId).snapshots().map((
+      snapshot,
+    ) {
       if (!snapshot.exists) return <String>[];
 
       final data = snapshot.data();
       final purchasedBooks = data?['purchasedBooks'] as List<dynamic>? ?? [];
 
       // Extract bookId from objects or use string directly (backward compatibility)
-      return purchasedBooks.map((item) {
-        if (item is String) {
-          return item; // Old format
-        } else if (item is Map) {
-          return item['bookId']?.toString() ?? '';
-        }
-        return '';
-      }).where((id) => id.isNotEmpty).toList();
+      return purchasedBooks
+          .map((item) {
+            if (item is String) {
+              return item; // Old format
+            } else if (item is Map) {
+              return item['bookId']?.toString() ?? '';
+            }
+            return '';
+          })
+          .where((id) => id.isNotEmpty)
+          .toList();
     });
   }
 
   /// Get stream of user's purchased books with full details
-  static Stream<List<Map<String, dynamic>>> getPurchasedBooksDetailsStream(String userId) {
-    return _firestore
-        .collection(_usersCollection)
-        .doc(userId)
-        .snapshots()
-        .map((snapshot) {
+  static Stream<List<Map<String, dynamic>>> getPurchasedBooksDetailsStream(
+    String userId,
+  ) {
+    return _firestore.collection(_usersCollection).doc(userId).snapshots().map((
+      snapshot,
+    ) {
       if (!snapshot.exists) return <Map<String, dynamic>>[];
 
       final data = snapshot.data();
       final purchasedBooks = data?['purchasedBooks'] as List<dynamic>? ?? [];
 
       // Convert to list of maps with purchase details
-      return purchasedBooks.map((item) {
-        if (item is String) {
-          // Old format: convert to new format
-          return {
-            'bookId': item,
-            'dateOfPurchase': DateTime.now().toIso8601String(),
-            'paymentId': 'migrated_${DateTime.now().millisecondsSinceEpoch}',
-          };
-        } else if (item is Map) {
-          // New format: return as is
-          return Map<String, dynamic>.from(item);
-        }
-        return <String, dynamic>{};
-      }).where((item) => item.isNotEmpty).toList();
+      return purchasedBooks
+          .map((item) {
+            if (item is String) {
+              // Old format: convert to new format
+              return {
+                'bookId': item,
+                'dateOfPurchase': DateTime.now().toIso8601String(),
+                'paymentId':
+                    'migrated_${DateTime.now().millisecondsSinceEpoch}',
+              };
+            } else if (item is Map) {
+              // New format: return as is
+              return Map<String, dynamic>.from(item);
+            }
+            return <String, dynamic>{};
+          })
+          .where((item) => item.isNotEmpty)
+          .toList();
     });
   }
 
@@ -104,8 +109,10 @@ class PurchaseService {
       // Create payment details document
       final paymentData = {
         'bookId': bookId,
-        'paymentId': paymentId ?? 'pay_${DateTime.now().millisecondsSinceEpoch}',
-        'transactionId': transactionId ?? 'txn_${DateTime.now().millisecondsSinceEpoch}',
+        'paymentId':
+            paymentId ?? 'pay_${DateTime.now().millisecondsSinceEpoch}',
+        'transactionId':
+            transactionId ?? 'txn_${DateTime.now().millisecondsSinceEpoch}',
         'amount': amount ?? 0.0,
         'purchaseDate': (purchaseDate ?? DateTime.now()).toIso8601String(),
         'status': 'completed',
@@ -124,8 +131,10 @@ class PurchaseService {
       final purchaseObject = {
         'bookId': bookId,
         'dateOfPurchase': (purchaseDate ?? DateTime.now()).toIso8601String(),
-        'paymentId': paymentId ?? 'pay_${DateTime.now().millisecondsSinceEpoch}',
-        'transactionId': transactionId ?? 'txn_${DateTime.now().millisecondsSinceEpoch}',
+        'paymentId':
+            paymentId ?? 'pay_${DateTime.now().millisecondsSinceEpoch}',
+        'transactionId':
+            transactionId ?? 'txn_${DateTime.now().millisecondsSinceEpoch}',
         'amount': amount ?? 0.0,
         'status': 'completed',
       };
@@ -167,10 +176,8 @@ class PurchaseService {
             }
             return item;
           }).toList();
-          
-          await userRef.update({
-            'purchasedBooks': updatedBooks,
-          });
+
+          await userRef.update({'purchasedBooks': updatedBooks});
         }
       }
     } catch (e) {
@@ -219,16 +226,19 @@ class PurchaseService {
 
       final data = userDoc.data();
       final purchasedBooks = data?['purchasedBooks'] as List<dynamic>? ?? [];
-      
+
       // Extract bookIds (handles both old and new format)
-      final purchasedSet = purchasedBooks.map((item) {
-        if (item is String) {
-          return item; // Old format
-        } else if (item is Map) {
-          return item['bookId']?.toString() ?? '';
-        }
-        return '';
-      }).where((id) => id.isNotEmpty).toSet();
+      final purchasedSet = purchasedBooks
+          .map((item) {
+            if (item is String) {
+              return item; // Old format
+            } else if (item is Map) {
+              return item['bookId']?.toString() ?? '';
+            }
+            return '';
+          })
+          .where((id) => id.isNotEmpty)
+          .toSet();
 
       return {for (var id in bookIds) id: purchasedSet.contains(id)};
     } catch (e) {
@@ -274,5 +284,44 @@ class PurchaseService {
       return null;
     }
   }
-}
 
+  /// Add purchased book from Apple IAP
+  static Future<void> addPurchasedBookFromIAP(
+    String userId,
+    String bookId, {
+    required String transactionId,
+    String? receipt,
+    double? amount,
+    DateTime? purchaseDate,
+  }) async {
+    try {
+      await addPurchasedBook(
+        userId,
+        bookId,
+        paymentId: 'iap_$transactionId',
+        transactionId: transactionId,
+        amount: amount,
+        purchaseDate: purchaseDate,
+      );
+
+      // Store receipt for future verification if provided
+      if (receipt != null) {
+        await _firestore
+            .collection(_usersCollection)
+            .doc(userId)
+            .collection('purchases')
+            .doc(bookId)
+            .update({
+              'receipt': receipt,
+              'platform': 'ios',
+              'paymentMethod': 'apple_iap',
+            });
+      }
+
+      print('✅ IAP purchase recorded for book: $bookId');
+    } catch (e) {
+      print('Error adding IAP purchase: $e');
+      rethrow;
+    }
+  }
+}

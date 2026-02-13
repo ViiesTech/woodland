@@ -58,6 +58,8 @@ dependencies:
   syncfusion_flutter_pdfviewer: ^31.1.19
   cached_network_image: ^3.3.1
   app_links: ^6.4.1
+  in_app_purchase: ^3.2.0
+  in_app_purchase_storekit: ^0.3.17+1
 
 dev_dependencies:
   flutter_test:
