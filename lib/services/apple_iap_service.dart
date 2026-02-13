@@ -57,9 +57,19 @@ class AppleIAPService {
 
         case PurchaseStatus.error:
           print('❌ Purchase error: ${purchaseDetails.error}');
-          onPurchaseError?.call(
-            purchaseDetails.error?.message ?? 'Purchase failed',
-          );
+          String errorMessage =
+              purchaseDetails.error?.message ?? 'Purchase failed';
+
+          // Add more context for sandbox/network errors
+          if (errorMessage.contains('SKErrorDomain')) {
+            errorMessage =
+                'App Store Error: $errorMessage. Please check your Sandbox account settings.';
+          } else if (errorMessage.contains('NSURLErrorDomain')) {
+            errorMessage =
+                'Network Error: Please check your internet connection or DNS settings. Apple servers cannot be reached.';
+          }
+
+          onPurchaseError?.call(errorMessage);
           break;
 
         case PurchaseStatus.canceled:
@@ -202,7 +212,8 @@ class AppleIAPService {
   /// Get available price tiers
   static List<String> getAvailablePriceTiers() {
     return [
-      'book_tier_399', // Your new standard price ($3.99)
+      'book_tier_339', // Target price ($3.39)
+      'book_tier_399', // Previous standard price ($3.99)
       'book_tier_99',
       'book_tier_499',
     ];

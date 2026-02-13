@@ -259,6 +259,8 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
 
         // Purchase result will be handled by callbacks
         // _handleIAPPurchaseComplete or _handleIAPPurchaseError
+        // We do NOT set _isPurchasing = false here because it should stay
+        // until the callback is triggered.
         return;
       }
 
@@ -302,12 +304,16 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
           CustomToast.showError(context, error);
         }
       }
+
+      // Reset for non-iOS platforms
+      if (mounted) {
+        setState(() {
+          _isPurchasing = false;
+        });
+      }
     } catch (e) {
       if (mounted) {
         CustomToast.showError(context, 'Error processing purchase: $e');
-      }
-    } finally {
-      if (mounted) {
         setState(() {
           _isPurchasing = false;
         });
@@ -703,54 +709,14 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
                                 ),
                               ),
                               8.verticalSpace,
-                              // Price - Show strikethrough and "Owned" if book is owned (not for admin)
+                              // Price - Show "Owned" badge if book is owned
                               BlocBuilder<AuthBloc, AuthState>(
                                 builder: (context, state) {
-                                  final isAdmin =
-                                      state is Authenticated &&
-                                      state.user.role == 'admin';
-
-                                  // Admin always sees regular price
-                                  if (isAdmin) {
-                                    return Text(
-                                      '\$${(_book.price).toStringAsFixed(2)}',
-                                      style: AppTextStyles.lufgaMedium.copyWith(
-                                        color: AppColors.primaryColor,
-                                        fontSize: 24.sp,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    );
-                                  }
-
-                                  // Regular users see owned status
                                   if (_isCheckingOwnership) {
-                                    return SizedBox(
-                                      height: 30.h,
-                                      child: Center(
-                                        child: CircularProgressIndicator(
-                                          color: AppColors.primaryColor,
-                                          strokeWidth: 2,
-                                        ),
-                                      ),
-                                    );
+                                    return SizedBox(height: 30.h);
                                   } else if (_isOwned) {
                                     return Column(
                                       children: [
-                                        // Strikethrough original price
-                                        Text(
-                                          '\$${(_book.price).toStringAsFixed(2)}',
-                                          style: AppTextStyles.lufgaMedium
-                                              .copyWith(
-                                                color: Colors.grey[600],
-                                                fontSize: 20.sp,
-                                                fontWeight: FontWeight.bold,
-                                                decoration:
-                                                    TextDecoration.lineThrough,
-                                                decorationColor:
-                                                    Colors.grey[600],
-                                              ),
-                                        ),
-                                        4.verticalSpace,
                                         // "Owned" text
                                         Container(
                                           padding: EdgeInsets.symmetric(
@@ -779,15 +745,7 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
                                       ],
                                     );
                                   } else {
-                                    // Regular price display
-                                    return Text(
-                                      '\$${(_book.price).toStringAsFixed(2)}',
-                                      style: AppTextStyles.lufgaMedium.copyWith(
-                                        color: AppColors.primaryColor,
-                                        fontSize: 24.sp,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    );
+                                    return const SizedBox.shrink();
                                   }
                                 },
                               ),
@@ -900,36 +858,57 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
                                                   color: Colors.grey,
                                                 ),
                                           ),
-                                          8.horizontalSpace,
-                                          TextButton(
-                                            onPressed: () {
-                                              setState(() {
-                                                _isPurchasing = false;
-                                              });
-                                            },
-                                            child: Text(
-                                              'Cancel',
-                                              style: AppTextStyles.regular
-                                                  .copyWith(
-                                                    fontSize: 14.sp,
-                                                    color: Colors.red,
-                                                  ),
+                                          if (!Platform.isIOS) ...[
+                                            8.horizontalSpace,
+                                            TextButton(
+                                              onPressed: () {
+                                                setState(() {
+                                                  _isPurchasing = false;
+                                                });
+                                              },
+                                              child: Text(
+                                                'Cancel',
+                                                style: AppTextStyles.regular
+                                                    .copyWith(
+                                                      fontSize: 14.sp,
+                                                      color: Colors.red,
+                                                    ),
+                                              ),
                                             ),
-                                          ),
+                                          ],
                                         ],
                                       );
                                     }
                                     // Show "Free Claim" for free books, "Purchase" for paid books
-                                    return GestureDetector(
-                                      onTap: _handlePurchase,
-                                      child: _buildActionButton(
-                                        icon: _book.price == 0
-                                            ? Icons.card_giftcard
-                                            : Icons.shopping_cart,
-                                        text: _book.price == 0
-                                            ? 'Free Claim'
-                                            : _getPurchaseButtonText(),
-                                      ),
+                                    return Column(
+                                      children: [
+                                        if (_book.price > 0) ...[
+                                          Text(
+                                            Platform.isIOS &&
+                                                    _iapProduct != null
+                                                ? _iapProduct!.price
+                                                : '\$${(_book.price).toStringAsFixed(2)}',
+                                            style: AppTextStyles.lufgaMedium
+                                                .copyWith(
+                                                  color: AppColors.primaryColor,
+                                                  fontSize: 24.sp,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                          ),
+                                          12.verticalSpace,
+                                        ],
+                                        GestureDetector(
+                                          onTap: _handlePurchase,
+                                          child: _buildActionButton(
+                                            icon: _book.price == 0
+                                                ? Icons.card_giftcard
+                                                : Icons.shopping_cart,
+                                            text: _book.price == 0
+                                                ? 'Free Claim'
+                                                : _getPurchaseButtonText(),
+                                          ),
+                                        ),
+                                      ],
                                     );
                                   }
                                 },
@@ -1540,12 +1519,6 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
 
   /// Get purchase button text with appropriate pricing
   String _getPurchaseButtonText() {
-    // On iOS, show App Store price if available
-    if (Platform.isIOS && _iapProduct != null) {
-      return 'Purchase - ${_iapProduct!.price}';
-    }
-
-    // Fallback to book price
-    return 'Purchase - \$${(_book.price).toStringAsFixed(2)}';
+    return 'Purchase';
   }
 }
