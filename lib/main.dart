@@ -44,7 +44,7 @@ void main() async {
     print('Error getting initial link: $e');
   }
 
-  runApp(DevicePreview(enabled: true, builder: (context) => const MyApp()));
+  runApp(DevicePreview(enabled: false, builder: (context) => const MyApp()));
 }
 
 class MyApp extends StatelessWidget {
