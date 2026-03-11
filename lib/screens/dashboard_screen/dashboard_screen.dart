@@ -11,7 +11,7 @@ import '../home/home_screen.dart';
 import '../admin_home/admin_home_screen.dart';
 import '../library/library_screen.dart';
 import '../messages/messages_screen.dart';
-import '../games/games_screen.dart';
+// import '../games/games_screen.dart';
 import '../blog/blog_list_screen.dart';
 import '../../services/global_audio_service.dart';
 import '../reading/listen_screen.dart';
@@ -34,7 +34,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         const AdminHomeScreen(),
         const LibraryScreen(),
         const MessagesScreen(),
-        const GamesScreen(),
+        // const GamesScreen(),
         const BlogListScreen(),
       ];
     } else {
@@ -42,7 +42,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         const HomeScreen(),
         const LibraryScreen(),
         const MessagesScreen(),
-        const GamesScreen(),
+        // const GamesScreen(),
         const BlogListScreen(),
       ];
     }
@@ -104,8 +104,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 Expanded(
                   child: _buildNavItem(2, AppAssets.messagesIcon, 'Messages'),
                 ),
-                Expanded(child: _buildNavItem(3, AppAssets.gamesIcon, 'Games')),
-                Expanded(child: _buildNavItem(4, AppAssets.blogIcon, 'Blog')),
+                // Expanded(child: _buildNavItem(3, AppAssets.gamesIcon, 'Games')),
+                Expanded(child: _buildNavItem(3, AppAssets.blogIcon, 'Blog')),
               ],
             ),
           ),
