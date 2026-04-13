@@ -1063,7 +1063,7 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
                                                               BorderRadius.circular(
                                                                 8.r,
                                                               ),
-                                                          child: Container(
+                                                          child: SizedBox(
                                                             height: 120.h,
                                                             width:
                                                                 double.infinity,
@@ -1317,7 +1317,7 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
                       padding: EdgeInsets.only(top: 120.h),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(12.r),
-                        child: Container(
+                        child: SizedBox(
                           height: 159.h,
                           width: 159.w,
                           child: _book.coverImageUrl.startsWith('http')

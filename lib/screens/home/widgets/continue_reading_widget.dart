@@ -153,7 +153,7 @@ class _BookDisplayWidgetState extends State<_BookDisplayWidget> {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
+                SizedBox(
                   width: 128.w,
                   height: 146.h,
                   child: book.coverImageUrl.startsWith('http')

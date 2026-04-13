@@ -498,7 +498,7 @@ class _AudiobookPageState extends State<AudiobookPage>
                             alignment: Alignment.centerLeft,
                             widthFactor: chapterIndex < chapters.length
                                 ? (chapterIndex + 1) /
-                                      (chapters.length > 0
+                                      (chapters.isNotEmpty
                                           ? chapters.length
                                           : 1)
                                 : 0.5,

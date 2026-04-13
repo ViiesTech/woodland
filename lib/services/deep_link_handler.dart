@@ -1,5 +1,3 @@
-import 'package:flutter/material.dart';
-import '../main.dart';
 
 class DeepLinkHandler {
   static void handleStripeDeepLink(String url) {

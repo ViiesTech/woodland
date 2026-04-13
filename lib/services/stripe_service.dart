@@ -109,7 +109,7 @@ class StripeService {
       // 4. Wait for Deep Link or Timeout
       // We also listen for App Lifecycle changes to detect manual return
       observer = _PaymentLifecycleObserver(completer);
-      WidgetsBinding.instance.addObserver(observer!);
+      WidgetsBinding.instance.addObserver(observer);
 
       return await completer.future;
     } on TimeoutException catch (_) {
@@ -131,7 +131,7 @@ class StripeService {
     } finally {
       linkSubscription?.cancel();
       if (observer != null) {
-        WidgetsBinding.instance.removeObserver(observer!);
+        WidgetsBinding.instance.removeObserver(observer);
       }
     }
   }

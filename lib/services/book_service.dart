@@ -28,7 +28,7 @@ class BookService {
               .map(
                 (doc) => BookModel.fromFirestore(
                   doc.id,
-                  doc.data() as Map<String, dynamic>,
+                  doc.data(),
                 ),
               )
               .toList();
@@ -49,7 +49,7 @@ class BookService {
               .map(
                 (doc) => BookModel.fromFirestore(
                   doc.id,
-                  doc.data() as Map<String, dynamic>,
+                  doc.data(),
                 ),
               )
               .toList();
@@ -69,7 +69,7 @@ class BookService {
               .map(
                 (doc) => BookModel.fromFirestore(
                   doc.id,
-                  doc.data() as Map<String, dynamic>,
+                  doc.data(),
                 ),
               )
               .toList();
@@ -206,7 +206,7 @@ class BookService {
               .map(
                 (doc) => BookModel.fromFirestore(
                   doc.id,
-                  doc.data() as Map<String, dynamic>,
+                  doc.data(),
                 ),
               )
               .toList();
@@ -291,7 +291,7 @@ class BookService {
           'updatedAt': FieldValue.serverTimestamp(),
         });
         print(
-          '✅ Incremented viewCount for book $bookId: ${currentCount} -> ${currentCount + 1}',
+          '✅ Incremented viewCount for book $bookId: $currentCount -> ${currentCount + 1}',
         );
       } else {
         print('⚠️ Book $bookId not found');
@@ -356,7 +356,7 @@ class BookService {
           'updatedAt': FieldValue.serverTimestamp(),
         });
         print(
-          '✅ Incremented listenCount for book $bookId: ${currentCount} -> ${currentCount + 1}',
+          '✅ Incremented listenCount for book $bookId: $currentCount -> ${currentCount + 1}',
         );
       } else {
         print('⚠️ Book $bookId not found');

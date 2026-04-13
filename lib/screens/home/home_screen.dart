@@ -164,8 +164,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                       progress['currentPage'] as int? ?? 1;
                                   final totalPages =
                                       progress['totalPages'] as int? ?? 1;
-                                  if (totalPages <= 0)
+                                  if (totalPages <= 0) {
                                     return true; // Keep if total pages is invalid
+                                  }
                                   final progressPercent =
                                       (currentPage / totalPages) * 100;
                                   return progressPercent <

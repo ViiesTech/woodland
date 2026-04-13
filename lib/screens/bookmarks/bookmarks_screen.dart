@@ -24,7 +24,7 @@ class BookmarksScreen extends StatefulWidget {
 
 class _BookmarksScreenState extends State<BookmarksScreen> {
   String? _currentUserId;
-  Map<String, BookModel> _bookmarkedBooks = {};
+  final Map<String, BookModel> _bookmarkedBooks = {};
   bool _isLoading = true;
   int _selectedTabIndex = 0; // 0 for E-book, 1 for Audiobook
 
@@ -72,7 +72,9 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
           // Handle removals instantly (synchronous update)
           if (removedIds.isNotEmpty) {
             setState(() {
-              removedIds.forEach((id) => _bookmarkedBooks.remove(id));
+              for (var id in removedIds) {
+                _bookmarkedBooks.remove(id);
+              }
             });
           }
 

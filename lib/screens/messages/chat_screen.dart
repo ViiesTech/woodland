@@ -914,7 +914,7 @@ class _ChatScreenState extends State<ChatScreen> {
       final minute = time.minute;
       final period = hour >= 12 ? 'PM' : 'AM';
       final hour12 = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour);
-      return '${hour12}:${minute.toString().padLeft(2, '0')} $period';
+      return '$hour12:${minute.toString().padLeft(2, '0')} $period';
     }
 
     // Yesterday

@@ -118,7 +118,7 @@ class GoogleAuthService {
       return null;
     } catch (e) {
       print('Error signing in with email: $e');
-      throw e;
+      rethrow;
     }
   }
 
@@ -151,7 +151,7 @@ class GoogleAuthService {
       return null;
     } catch (e) {
       print('Error registering with email: $e');
-      throw e;
+      rethrow;
     }
   }
 }

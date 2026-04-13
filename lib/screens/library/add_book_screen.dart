@@ -39,7 +39,7 @@ class _AddBookScreenState extends State<AddBookScreen> {
   String? _pdfUrl; // Will be set after upload
 
   // Chapters for audiobook: List of {chapterName: String, audioFile: File?, audioUrl: String?}
-  List<Map<String, dynamic>> _chapters = [];
+  final List<Map<String, dynamic>> _chapters = [];
 
   bool _isPublished = true;
   bool _isLoading = false;
@@ -104,7 +104,7 @@ class _AddBookScreenState extends State<AddBookScreen> {
       final bytes = await pdfFile.readAsBytes();
       final fileSize = bytes.length;
 
-      print('📄 PDF file size: ${fileSize} bytes');
+      print('📄 PDF file size: $fileSize bytes');
 
       // For large files, check beginning (first 50KB) and end (last 50KB)
       // Encryption info is typically in the trailer at the end or in root object

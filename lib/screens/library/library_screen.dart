@@ -12,6 +12,7 @@ import '../../components/resource/app_textstyle.dart';
 import '../../models/user_model.dart';
 import 'widgets/custom_tab_widget.dart';
 import 'pages/audiobook_page.dart';
+import 'pages/library_videos_page.dart';
 import 'add_book_screen.dart';
 
 class LibraryScreen extends StatefulWidget {
@@ -65,7 +66,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
                   Row(
                     children: [
                       // Add Book Icon (only for admin)
-                      if (isAdmin)
+                      if (isAdmin && selectedTabIndex != 1)
                         GestureDetector(
                           onTap: () {
                             AppRouter.routeTo(
@@ -125,17 +126,18 @@ class _LibraryScreenState extends State<LibraryScreen> {
                     selectedTabIndex = index;
                   });
                 },
-                tabs: ['E-book', 'Audiobook'],
+                tabs: ['E-book', 'Videos', 'Audiobook'],
               ),
             ),
             20.verticalSpace,
 
-            // Tab Content - Use IndexedStack to keep both pages alive and prevent rebuilds
+            // Tab Content - Use IndexedStack to keep pages alive and prevent rebuilds
             Expanded(
               child: IndexedStack(
                 index: selectedTabIndex,
                 children: [
                   EbookPage(),
+                  LibraryVideosPage(),
                   AudiobookPage(),
                 ],
               ),
