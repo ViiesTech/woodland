@@ -13,6 +13,7 @@ import '../../models/user_model.dart';
 import 'widgets/custom_tab_widget.dart';
 import 'pages/audiobook_page.dart';
 import 'pages/library_videos_page.dart';
+import 'pages/add_video_screen.dart';
 import 'add_book_screen.dart';
 
 class LibraryScreen extends StatefulWidget {
@@ -25,6 +26,7 @@ class LibraryScreen extends StatefulWidget {
 class _LibraryScreenState extends State<LibraryScreen> {
   int selectedTabIndex = 0;
   bool isAdmin = false;
+  final GlobalKey<LibraryVideosPageState> _videoPageKey = GlobalKey();
 
   @override
   void initState() {
@@ -38,6 +40,13 @@ class _LibraryScreenState extends State<LibraryScreen> {
       setState(() {
         isAdmin = authState.user.role == 'admin';
       });
+    }
+  }
+
+  Future<void> _refreshVideoTab() async {
+    final state = _videoPageKey.currentState;
+    if (state != null) {
+      await state.loadVideos();
     }
   }
 
@@ -65,18 +74,26 @@ class _LibraryScreenState extends State<LibraryScreen> {
 
                   Row(
                     children: [
-                      // Add Book Icon (only for admin)
-                      if (isAdmin && selectedTabIndex != 1)
+                      // Add Book/Video Icon (only for admin)
+                      if (isAdmin)
                         GestureDetector(
-                          onTap: () {
-                            AppRouter.routeTo(
-                              context,
-                              AddBookScreen(
-                                initialType: selectedTabIndex == 0
-                                    ? 'ebook'
-                                    : 'audiobook',
-                              ),
-                            );
+                          onTap: () async {
+                            if (selectedTabIndex == 1) {
+                              await AppRouter.routeTo(
+                                context,
+                                const AddVideoScreen(),
+                              );
+                              await _refreshVideoTab();
+                            } else {
+                              await AppRouter.routeTo(
+                                context,
+                                AddBookScreen(
+                                  initialType: selectedTabIndex == 0
+                                      ? 'ebook'
+                                      : 'audiobook',
+                                ),
+                              );
+                            }
                           },
                           child: Container(
                             margin: EdgeInsets.only(right: 12.w),
@@ -121,10 +138,13 @@ class _LibraryScreenState extends State<LibraryScreen> {
               padding: EdgeInsets.symmetric(horizontal: 16.w),
               child: CustomTabWidget(
                 selectedIndex: selectedTabIndex,
-                onTabChanged: (index) {
+                onTabChanged: (index) async {
                   setState(() {
                     selectedTabIndex = index;
                   });
+                  if (index == 1) {
+                    await _refreshVideoTab();
+                  }
                 },
                 tabs: ['E-book', 'Videos', 'Audiobook'],
               ),
@@ -137,7 +157,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
                 index: selectedTabIndex,
                 children: [
                   EbookPage(),
-                  LibraryVideosPage(),
+                  LibraryVideosPage(key: _videoPageKey),
                   AudiobookPage(),
                 ],
               ),

@@ -14,23 +14,28 @@ import 'package:the_woodlands_series/bloc/auth/auth_state.dart';
 import 'package:the_woodlands_series/models/library_youtube_video.dart';
 import 'package:the_woodlands_series/services/library_video_recent_service.dart';
 
+import 'package:the_woodlands_series/admin_panel/services/firebase_service.dart';
+import 'package:the_woodlands_series/components/button/primary_button.dart';
+import 'package:the_woodlands_series/screens/library/pages/library_youtube_player_screen.dart';
+
 class LibraryVideosPage extends StatefulWidget {
   const LibraryVideosPage({super.key});
 
   @override
-  State<LibraryVideosPage> createState() => _LibraryVideosPageState();
+  State<LibraryVideosPage> createState() => LibraryVideosPageState();
 }
 
-class _LibraryVideosPageState extends State<LibraryVideosPage>
+class LibraryVideosPageState extends State<LibraryVideosPage>
     with AutomaticKeepAliveClientMixin {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
-  List<LibraryYoutubeVideo> _recentWatchVideos = [];
+  List<LibraryYoutubeVideo> _firestoreVideos = [];
+  bool _isVideosLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _loadRecentVideos();
+    loadVideos();
   }
 
   @override
@@ -42,36 +47,52 @@ class _LibraryVideosPageState extends State<LibraryVideosPage>
   @override
   bool get wantKeepAlive => true;
 
-  Future<void> _loadRecentVideos() async {
-    final ids = await LibraryVideoRecentService.getRecentVideoIds();
+  Future<void> loadVideos() async {
     if (!mounted) return;
-    final resolved = <LibraryYoutubeVideo>[];
-    for (final id in ids) {
-      for (final v in kLibraryYoutubeVideos) {
-        if (v.videoId == id) {
-          resolved.add(v);
-          break;
-        }
+    setState(() {
+      _isVideosLoading = true;
+    });
+
+    try {
+      final videos = await FirebaseService.getLibraryVideos();
+      if (mounted) {
+        setState(() {
+          _firestoreVideos = videos;
+          _isVideosLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isVideosLoading = false;
+        });
       }
     }
-    setState(() {
-      _recentWatchVideos = resolved;
-    });
   }
 
-  Future<void> _clearRecentVideos() async {
-    await LibraryVideoRecentService.clearRecent();
-    if (mounted) {
-      setState(() {
-        _recentWatchVideos = [];
-      });
+  Future<void> _toggleVideoStatus(LibraryYoutubeVideo video) async {
+    try {
+      final newStatus = !video.isPublished;
+      await FirebaseService.updateVideoStatus(video.id, newStatus);
+      if (mounted) {
+        CustomToast.showSuccess(
+          context, 
+          'Video ${newStatus ? 'published' : 'unpublished'} successfully!'
+        );
+        loadVideos();
+      }
+    } catch (e) {
+      if (mounted) {
+        CustomToast.showError(context, 'Failed to update status');
+      }
     }
   }
 
   List<LibraryYoutubeVideo> get _filteredVideos {
     final q = _searchQuery.trim().toLowerCase();
-    if (q.isEmpty) return List<LibraryYoutubeVideo>.from(kLibraryYoutubeVideos);
-    return kLibraryYoutubeVideos
+    final all = _firestoreVideos;
+    if (q.isEmpty) return List<LibraryYoutubeVideo>.from(all);
+    return all
         .where(
           (v) =>
               v.title.toLowerCase().contains(q) ||
@@ -80,12 +101,12 @@ class _LibraryVideosPageState extends State<LibraryVideosPage>
         .toList();
   }
 
-  SliverGridDelegateWithFixedCrossAxisCount _videoGridDelegate(bool isAdmin) {
+  SliverGridDelegateWithFixedCrossAxisCount _videoGridDelegate() {
     return SliverGridDelegateWithFixedCrossAxisCount(
       crossAxisCount: 3,
       crossAxisSpacing: 16.w,
       mainAxisSpacing: 16.h,
-      childAspectRatio: isAdmin ? 0.48 : 0.52,
+      childAspectRatio: 0.48,
     );
   }
 
@@ -105,10 +126,170 @@ class _LibraryVideosPageState extends State<LibraryVideosPage>
     }
   }
 
-  Future<void> _onVideoTap(LibraryYoutubeVideo video) async {
-    await LibraryVideoRecentService.addRecentVideoId(video.videoId);
-    await _loadRecentVideos();
-    await _openYoutube(video);
+  void _showRedirectionDialog(LibraryYoutubeVideo video, bool isAdmin) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: AppColors.boxClr,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20.r),
+        ),
+        child: Padding(
+          padding: EdgeInsets.all(24.w),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Watch Video',
+                style: AppTextStyles.lufgaLarge.copyWith(
+                  color: Colors.white,
+                  fontSize: 22.sp,
+                ),
+              ),
+              20.verticalSpace,
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12.r),
+                child: CachedNetworkImage(
+                  imageUrl: video.thumbnailUrl,
+                  height: 140.h,
+                  width: double.infinity,
+                  fit: BoxFit.contain,
+                ),
+              ),
+              20.verticalSpace,
+              Text(
+                video.title,
+                textAlign: TextAlign.center,
+                style: AppTextStyles.medium.copyWith(
+                  color: Colors.white,
+                  fontSize: 16.sp,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              12.verticalSpace,
+              Text(
+                'Choose how you would like to watch this video.',
+                textAlign: TextAlign.center,
+                style: AppTextStyles.regular.copyWith(
+                  color: Colors.white.withOpacity(0.7),
+                  fontSize: 14.sp,
+                ),
+              ),
+              28.verticalSpace,
+              Column(
+                children: [
+                  PrimaryButton(
+                    title: 'Play',
+                    icon: Icon(
+                      Icons.play_circle_outline,
+                      color: AppColors.bgClr,
+                      size: 20.sp,
+                    ),
+                    shadow: true,
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) =>
+                              LibraryYoutubePlayerScreen(video: video),
+                        ),
+                      );
+                    },
+                    verPadding: 16.h,
+                    fontSize: 15.sp,
+                    buttonWidth: double.infinity,
+                  ),
+                  12.verticalSpace,
+                  // GestureDetector(
+                  //   onTap: () {
+                  //     Navigator.pop(context);
+                  //     _openYoutube(video);
+                  //   },
+                  //   child: Container(
+                  //     height: 52.h,
+                  //     width: double.infinity,
+                  //     decoration: BoxDecoration(
+                  //       color: Colors.transparent,
+                  //       border: Border.all(
+                  //         color: Colors.white.withOpacity(0.2),
+                  //       ),
+                  //       borderRadius: BorderRadius.circular(10.r),
+                  //     ),
+                  //     child: Center(
+                  //       child: Row(
+                  //         mainAxisAlignment: MainAxisAlignment.center,
+                  //         children: [
+                  //           Icon(
+                  //             Icons.open_in_new,
+                  //             color: Colors.white70,
+                  //             size: 18.sp,
+                  //           ),
+                  //           8.horizontalSpace,
+                  //           Text(
+                  //             'Watch on YouTube',
+                  //             style: AppTextStyles.medium.copyWith(
+                  //               color: Colors.white70,
+                  //               fontSize: 15.sp,
+                  //             ),
+                  //           ),
+                  //         ],
+                  //       ),
+                  //     ),
+                  //   ),
+                  // ),
+                  if (isAdmin) ...[
+                    16.verticalSpace,
+                    GestureDetector(
+                      onTap: () {
+                        Navigator.pop(context);
+                        _toggleVideoStatus(video);
+                      },
+                      child: Container(
+                        height: 52.h,
+                        width: double.infinity,
+                        decoration: BoxDecoration(
+                          color: Colors.transparent,
+                          border: Border.all(
+                            color: video.isPublished 
+                                ? Colors.redAccent.withOpacity(0.5) 
+                                : AppColors.primaryColor.withOpacity(0.5)
+                          ),
+                          borderRadius: BorderRadius.circular(10.r),
+                        ),
+                        child: Center(
+                          child: Text(
+                            video.isPublished ? 'Unpublish' : 'Publish',
+                            style: AppTextStyles.medium.copyWith(
+                              color: video.isPublished 
+                                  ? Colors.redAccent 
+                                  : AppColors.primaryColor,
+                              fontSize: 15.sp,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                  16.verticalSpace,
+                  GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: Text(
+                      'Cancel',
+                      style: AppTextStyles.medium.copyWith(
+                        color: Colors.white38,
+                        fontSize: 14.sp,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -125,7 +306,7 @@ class _LibraryVideosPageState extends State<LibraryVideosPage>
               padding: EdgeInsets.symmetric(horizontal: 16.w),
               child: PrimaryTextField(
                 controller: _searchController,
-                hint: 'Title, author or keyword',
+                hint: 'Search videos...',
                 prefixIcon: Icon(Icons.search, size: 20.sp),
                 height: 55.h,
                 verticalPad: 10.h,
@@ -133,158 +314,121 @@ class _LibraryVideosPageState extends State<LibraryVideosPage>
                   setState(() {
                     _searchQuery = value;
                   });
-                  if (value.trim().isEmpty) {
-                    _loadRecentVideos();
-                  }
                 },
               ),
             ),
             16.verticalSpace,
             Expanded(
-              child: Builder(
-                builder: (context) {
-                  final videos = _filteredVideos;
-                  if (videos.isEmpty) {
-                    return Center(
-                      child: Text(
-                        _searchQuery.isEmpty
-                            ? 'No videos available'
-                            : 'No videos found',
-                        style: AppTextStyles.regular.copyWith(
-                          color: Colors.white.withValues(alpha: 0.6),
-                          fontSize: 14.sp,
-                        ),
+              child: _isVideosLoading
+                  ? const Center(
+                      child: CircularProgressIndicator(
+                        color: AppColors.primaryColor,
                       ),
-                    );
-                  }
+                    )
+                  : Builder(
+                      builder: (context) {
+                        final allFiltered = _filteredVideos;
+                        
+                        if (isAdmin) {
+                          final published = allFiltered.where((v) => v.isPublished).toList();
+                          final unpublished = allFiltered.where((v) => !v.isPublished).toList();
 
-                  return SingleChildScrollView(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (_searchQuery.isEmpty) ...[
-                          Padding(
+                          if (allFiltered.isEmpty) {
+                            return Center(
+                              child: Text(
+                                'No videos found',
+                                style: AppTextStyles.regular.copyWith(
+                                  color: Colors.white.withOpacity(0.6),
+                                  fontSize: 14.sp,
+                                ),
+                              ),
+                            );
+                          }
+
+                          return ListView(
                             padding: EdgeInsets.symmetric(horizontal: 16.w),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
+                            children: [
+                              if (published.isNotEmpty) ...[
                                 Text(
-                                  'Recent Searches',
+                                  'Published Videos',
                                   style: AppTextStyles.lufgaLarge.copyWith(
                                     color: Colors.white,
                                     fontSize: 20.sp,
                                   ),
                                 ),
-                                if (_recentWatchVideos.isNotEmpty)
-                                  GestureDetector(
-                                    onTap: _clearRecentVideos,
-                                    child: Text(
-                                      'Clear',
-                                      style: AppTextStyles.regular.copyWith(
-                                        color: AppColors.primaryColor,
-                                        fontSize: 14.sp,
-                                      ),
-                                    ),
-                                  ),
+                                16.verticalSpace,
+                                GridView.builder(
+                                  shrinkWrap: true,
+                                  physics: const NeverScrollableScrollPhysics(),
+                                  gridDelegate: _videoGridDelegate(),
+                                  itemCount: published.length,
+                                  itemBuilder: (context, index) {
+                                    final video = published[index];
+                                    return _LibraryVideoTile(
+                                      video: video,
+                                      onTap: () => _showRedirectionDialog(video, true),
+                                    );
+                                  },
+                                ),
+                                26.verticalSpace,
                               ],
-                            ),
-                          ),
-                          16.verticalSpace,
-                          if (_recentWatchVideos.isEmpty)
-                            Padding(
-                              padding: EdgeInsets.symmetric(horizontal: 16.w),
+                              if (unpublished.isNotEmpty) ...[
+                                Text(
+                                  'Unpublished Videos',
+                                  style: AppTextStyles.lufgaLarge.copyWith(
+                                    color: Colors.white,
+                                    fontSize: 20.sp,
+                                  ),
+                                ),
+                                16.verticalSpace,
+                                GridView.builder(
+                                  shrinkWrap: true,
+                                  physics: const NeverScrollableScrollPhysics(),
+                                  gridDelegate: _videoGridDelegate(),
+                                  itemCount: unpublished.length,
+                                  itemBuilder: (context, index) {
+                                    final video = unpublished[index];
+                                    return _LibraryVideoTile(
+                                      video: video,
+                                      onTap: () => _showRedirectionDialog(video, true),
+                                    );
+                                  },
+                                ),
+                                26.verticalSpace,
+                              ],
+                            ],
+                          );
+                        } else {
+                          // Regular User - Only published
+                          final published = allFiltered.where((v) => v.isPublished).toList();
+                          
+                          if (published.isEmpty) {
+                            return Center(
                               child: Text(
-                                'No recent searches',
+                                'No videos available',
                                 style: AppTextStyles.regular.copyWith(
-                                  color: Colors.white.withValues(alpha: 0.6),
+                                  color: Colors.white.withOpacity(0.6),
                                   fontSize: 14.sp,
                                 ),
                               ),
-                            )
-                          else
-                            SizedBox(
-                              height: 200.h,
-                              child: ListView.builder(
-                                scrollDirection: Axis.horizontal,
-                                itemCount: _recentWatchVideos.length,
-                                padding: EdgeInsets.symmetric(horizontal: 16.w),
-                                itemBuilder: (context, index) {
-                                  final video = _recentWatchVideos[index];
-                                  return Container(
-                                    margin: EdgeInsets.only(right: 16.w),
-                                    child: _LibraryVideoTile(
-                                      video: video,
-                                      onTap: () => _onVideoTap(video),
-                                    ),
-                                  );
-                                },
-                              ),
-                            ),
-                          26.verticalSpace,
-                          if (kLibraryYoutubeVideos.isNotEmpty) ...[
-                            Padding(
-                              padding: EdgeInsets.symmetric(horizontal: 16.w),
-                              child: Text(
-                                'Featured',
-                                style: AppTextStyles.lufgaLarge.copyWith(
-                                  color: Colors.white,
-                                  fontSize: 20.sp,
-                                ),
-                              ),
-                            ),
-                            16.verticalSpace,
-                            Padding(
-                              padding: EdgeInsets.symmetric(horizontal: 16.w),
-                              child: GridView.builder(
-                                shrinkWrap: true,
-                                physics: const NeverScrollableScrollPhysics(),
-                                gridDelegate: _videoGridDelegate(isAdmin),
-                                itemCount: min(6, kLibraryYoutubeVideos.length),
-                                itemBuilder: (context, index) {
-                                  final video = kLibraryYoutubeVideos[index];
-                                  return _LibraryVideoTile(
-                                    video: video,
-                                    onTap: () => _onVideoTap(video),
-                                  );
-                                },
-                              ),
-                            ),
-                            26.verticalSpace,
-                          ],
-                          Padding(
+                            );
+                          }
+
+                          return GridView.builder(
                             padding: EdgeInsets.symmetric(horizontal: 16.w),
-                            child: Text(
-                              'New Release',
-                              style: AppTextStyles.lufgaLarge.copyWith(
-                                color: Colors.white,
-                                fontSize: 20.sp,
-                              ),
-                            ),
-                          ),
-                          16.verticalSpace,
-                        ],
-                        Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 16.w),
-                          child: GridView.builder(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            gridDelegate: _videoGridDelegate(isAdmin),
-                            itemCount: videos.length,
+                            gridDelegate: _videoGridDelegate(),
+                            itemCount: published.length,
                             itemBuilder: (context, index) {
-                              final video = videos[index];
+                              final video = published[index];
                               return _LibraryVideoTile(
                                 video: video,
-                                onTap: () => _onVideoTap(video),
+                                onTap: () => _showRedirectionDialog(video, false),
                               );
                             },
-                          ),
-                        ),
-                        26.verticalSpace,
-                      ],
+                          );
+                        }
+                      },
                     ),
-                  );
-                },
-              ),
             ),
           ],
         );
@@ -330,7 +474,7 @@ class _LibraryVideoTile extends StatelessWidget {
                     color: Colors.grey.shade900,
                     child: CachedNetworkImage(
                       imageUrl: video.thumbnailUrl,
-                      fit: BoxFit.cover,
+                      fit: BoxFit.contain,
                       width: double.infinity,
                       height: 119.h,
                       memCacheWidth: 244,
@@ -361,7 +505,7 @@ class _LibraryVideoTile extends StatelessWidget {
                   Center(
                     child: Icon(
                       Icons.play_circle_fill,
-                      color: Colors.white.withValues(alpha: 0.95),
+                      color: Colors.white.withOpacity(0.95),
                       size: 44.sp,
                       shadows: const [
                         Shadow(
@@ -389,7 +533,7 @@ class _LibraryVideoTile extends StatelessWidget {
             Text(
               video.description,
               style: AppTextStyles.regular.copyWith(
-                color: Colors.white,
+                color: Colors.white.withOpacity(0.7),
                 fontSize: 10.sp,
               ),
               maxLines: 1,

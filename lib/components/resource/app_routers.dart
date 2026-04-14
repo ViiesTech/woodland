@@ -2,13 +2,13 @@ import 'package:flutter/material.dart';
 
 class AppRouter {
   /// Push new page
-  static void routeTo(BuildContext context, Widget page) {
-    Navigator.push(context, MaterialPageRoute(builder: (_) => page));
+  static Future<dynamic> routeTo(BuildContext context, Widget page) {
+    return Navigator.push(context, MaterialPageRoute(builder: (_) => page));
   }
 
   /// Push and replace current page
-  static void replace(BuildContext context, Widget page) {
-    Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => page));
+  static Future<dynamic> replace(BuildContext context, Widget page) {
+    return Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => page));
   }
 
   /// Push and remove all previous routes
