@@ -2,7 +2,9 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class YoutubeService {
-  static const String _apiKey = 'AIzaSyBdrNYJ7xvlUyVvdQ247E8ej8oHhavTdPk';
+  // static const String _apiKey = 'AIzaSyBdrNYJ7xvlUyVvdQ247E8ej8oHhavTdPk';
+  static const String _apiKey = 'AIzaSyAcTx8vAaMI0OPKvI31HtFYkx_yqD_fzYo';
+  
   static const String _baseUrl = 'https://www.googleapis.com/youtube/v3/videos';
 
   /// Fetches video details (title, description, thumbnails) using video ID.
