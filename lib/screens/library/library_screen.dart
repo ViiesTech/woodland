@@ -14,6 +14,8 @@ import 'widgets/custom_tab_widget.dart';
 import 'pages/audiobook_page.dart';
 import 'pages/library_videos_page.dart';
 import 'pages/add_video_screen.dart';
+import 'pages/add_mp3_screen.dart';
+import 'pages/mp3_page.dart';
 import 'add_book_screen.dart';
 
 class LibraryScreen extends StatefulWidget {
@@ -27,6 +29,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
   int selectedTabIndex = 0;
   bool isAdmin = false;
   final GlobalKey<LibraryVideosPageState> _videoPageKey = GlobalKey();
+  final GlobalKey<Mp3PageState> _mp3PageKey = GlobalKey();
 
   @override
   void initState() {
@@ -47,6 +50,13 @@ class _LibraryScreenState extends State<LibraryScreen> {
     final state = _videoPageKey.currentState;
     if (state != null) {
       await state.loadVideos();
+    }
+  }
+
+  Future<void> _refreshMp3Tab() async {
+    final state = _mp3PageKey.currentState;
+    if (state != null) {
+      await state.loadMp3s();
     }
   }
 
@@ -84,6 +94,12 @@ class _LibraryScreenState extends State<LibraryScreen> {
                                 const AddVideoScreen(),
                               );
                               await _refreshVideoTab();
+                            } else if (selectedTabIndex == 3) {
+                              await AppRouter.routeTo(
+                                context,
+                                const AddMp3Screen(),
+                              );
+                              await _refreshMp3Tab();
                             } else {
                               await AppRouter.routeTo(
                                 context,
@@ -144,9 +160,11 @@ class _LibraryScreenState extends State<LibraryScreen> {
                   });
                   if (index == 1) {
                     await _refreshVideoTab();
+                  } else if (index == 3) {
+                    await _refreshMp3Tab();
                   }
                 },
-                tabs: ['E-book', 'Videos', 'Audiobook'],
+                tabs: ['E-book', 'Videos', 'Audiobook', 'Songs'],
               ),
             ),
             20.verticalSpace,
@@ -159,6 +177,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
                   EbookPage(),
                   LibraryVideosPage(key: _videoPageKey),
                   AudiobookPage(),
+                  Mp3Page(key: _mp3PageKey),
                 ],
               ),
             ),

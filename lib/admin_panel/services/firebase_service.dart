@@ -1,11 +1,13 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/book_model.dart';
 import '../../models/library_youtube_video.dart';
+import '../../models/mp3_model.dart';
 
 class FirebaseService {
   static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   static const String _booksCollection = 'books';
   static const String _videosCollection = 'youtube_videos';
+  static const String _mp3Collection = 'mp3';
 
   // Add a new book
   static Future<String> addBook(BookModel book) async {
@@ -24,6 +26,42 @@ class FirebaseService {
       return docRef.id;
     } catch (e) {
       throw Exception('Failed to add library video: $e');
+    }
+  }
+
+  // Add a new MP3
+  static Future<String> addMp3(Mp3Model mp3) async {
+    try {
+      final docRef = await _firestore.collection(_mp3Collection).add(mp3.toMap());
+      return docRef.id;
+    } catch (e) {
+      throw Exception('Failed to add MP3: $e');
+    }
+  }
+
+  // Get all MP3s
+  static Future<List<Mp3Model>> getMp3s() async {
+    try {
+      final querySnapshot = await _firestore
+          .collection(_mp3Collection)
+          .orderBy('createdAt', descending: true)
+          .get();
+      return querySnapshot.docs.map((doc) {
+        return Mp3Model.fromMap(doc.data(), doc.id);
+      }).toList();
+    } catch (e) {
+      throw Exception('Failed to get MP3s: $e');
+    }
+  }
+
+  // Update MP3 status
+  static Future<void> updateMp3Status(String id, bool isPublished) async {
+    try {
+      await _firestore.collection(_mp3Collection).doc(id).update({
+        'isPublished': isPublished,
+      });
+    } catch (e) {
+      throw Exception('Failed to update MP3 status: $e');
     }
   }
 

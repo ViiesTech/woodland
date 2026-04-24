@@ -24,14 +24,15 @@ class CustomTabWidget extends StatelessWidget {
         borderRadius: BorderRadius.circular(10.r),
       ),
       padding: EdgeInsets.all(5.w),
-      child: Row(
-        children: tabs.asMap().entries.map((entry) {
-          final index = entry.key;
-          final tab = entry.value;
-          final isSelected = selectedIndex == index;
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: tabs.asMap().entries.map((entry) {
+            final index = entry.key;
+            final tab = entry.value;
+            final isSelected = selectedIndex == index;
 
-          return Expanded(
-            child: GestureDetector(
+            return GestureDetector(
               onTap: () => onTabChanged(index),
               child: Container(
                 decoration: BoxDecoration(
@@ -40,7 +41,7 @@ class CustomTabWidget extends StatelessWidget {
                       : Colors.transparent,
                   borderRadius: BorderRadius.circular(10.r),
                 ),
-                padding: EdgeInsets.symmetric(vertical: 12.h),
+                padding: EdgeInsets.symmetric(vertical: 12.h, horizontal: 20.w),
                 child: Center(
                   child: Text(
                     tab,
@@ -53,9 +54,9 @@ class CustomTabWidget extends StatelessWidget {
                   ),
                 ),
               ),
-            ),
-          );
-        }).toList(),
+            );
+          }).toList(),
+        ),
       ),
     );
   }
