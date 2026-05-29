@@ -18,6 +18,7 @@ import 'package:the_woodlands_series/bloc/auth/auth_state.dart';
 import 'package:the_woodlands_series/screens/book_detail/book_detail_screen.dart';
 import 'package:the_woodlands_series/screens/games/game_detail_screen.dart';
 import 'package:the_woodlands_series/components/button/bookmark_icon_button.dart';
+import 'package:the_woodlands_series/admin_panel/screens/add_edit_folder_screen.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -275,9 +276,10 @@ class _SearchScreenState extends State<SearchScreen> {
                 ),
               ),
               StreamBuilder<List<BookModel>>(
-                stream: isAdmin
-                    ? BookService.searchAllBooks(_searchQuery, null)
-                    : BookService.searchBooks(_searchQuery, null),
+                stream: BookService.searchEbooksAndFoldersStream(
+                  _searchQuery,
+                  isAdmin: isAdmin,
+                ),
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting &&
                       !snapshot.hasData) {
@@ -329,6 +331,23 @@ class _SearchScreenState extends State<SearchScreen> {
                       padding: EdgeInsets.symmetric(horizontal: 16.w),
                       itemBuilder: (context, index) {
                         final book = books[index];
+                        if (book.isFolder) {
+                          return Container(
+                            margin: EdgeInsets.only(right: 16.w),
+                            child: GestureDetector(
+                              onTap: () => _showFolderBooksModal(context, book, isAdmin),
+                              child: GlobalCard(
+                                title: book.title,
+                                author: book.author,
+                                imageAsset: book.coverImageUrl,
+                                listenTime: '${book.listenTime}m',
+                                readTime: '${book.readTime}m',
+                                book: book,
+                              ),
+                            ),
+                          );
+                        }
+
                         return Container(
                           margin: EdgeInsets.only(right: 16.w),
                           child: Stack(
@@ -470,6 +489,191 @@ class _SearchScreenState extends State<SearchScreen> {
               26.verticalSpace,
             ],
           ),
+        );
+      },
+    );
+  }
+  void _showFolderBooksModal(BuildContext context, BookModel folder, bool isAdmin) {
+    BookService.incrementViewCount(folder.id);
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.bgClr,
+      isScrollControlled: true,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24.r)),
+      ),
+      builder: (context) {
+        final bookIds = folder.bookIds ?? [];
+        return DraggableScrollableSheet(
+          initialChildSize: 0.6,
+          minChildSize: 0.4,
+          maxChildSize: 0.95,
+          expand: false,
+          builder: (context, scrollController) {
+            return Container(
+              padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40.w,
+                      height: 5.h,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.3),
+                        borderRadius: BorderRadius.circular(10.r),
+                      ),
+                    ),
+                  ),
+                  16.verticalSpace,
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.folder_open,
+                        color: AppColors.primaryColor,
+                        size: 28.sp,
+                      ),
+                      12.horizontalSpace,
+                      Expanded(
+                        child: Text(
+                          folder.title,
+                          style: AppTextStyles.lufgaLarge.copyWith(
+                            color: Colors.white,
+                            fontSize: 18.sp,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (isAdmin) ...[
+                        IconButton(
+                          icon: Icon(Icons.edit, color: AppColors.primaryColor, size: 20.sp),
+                          tooltip: 'Edit Folder',
+                          onPressed: () async {
+                            Navigator.pop(context);
+                            await AppRouter.routeTo(
+                              context,
+                              AddEditFolderScreen(folder: folder),
+                            );
+                          },
+                        ),
+                      ],
+                    ],
+                  ),
+                  if (folder.description.isNotEmpty) ...[
+                    8.verticalSpace,
+                    Text(
+                      folder.description,
+                      style: AppTextStyles.regular.copyWith(
+                        color: Colors.white.withOpacity(0.6),
+                        fontSize: 12.sp,
+                      ),
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                  16.verticalSpace,
+                  Divider(color: Colors.white.withOpacity(0.1)),
+                  16.verticalSpace,
+                  Expanded(
+                    child: bookIds.isEmpty
+                        ? Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.library_books,
+                                  color: Colors.white.withOpacity(0.2),
+                                  size: 48.sp,
+                                ),
+                                12.verticalSpace,
+                                Text(
+                                  'This folder is empty',
+                                  style: AppTextStyles.medium.copyWith(
+                                    color: Colors.white.withOpacity(0.5),
+                                    fontSize: 14.sp,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        : StreamBuilder<List<BookModel>>(
+                            stream: BookService.getAllPublishedBooks(),
+                            builder: (context, snapshot) {
+                              if (snapshot.connectionState == ConnectionState.waiting &&
+                                  !snapshot.hasData) {
+                                return const Center(
+                                  child: CircularProgressIndicator(
+                                    color: Colors.orange,
+                                  ),
+                                );
+                              }
+                              if (snapshot.hasError) {
+                                return Center(
+                                  child: Text(
+                                    'Error loading books',
+                                    style: AppTextStyles.regular.copyWith(
+                                      color: Colors.white.withOpacity(0.5),
+                                      fontSize: 12.sp,
+                                    ),
+                                  ),
+                                );
+                              }
+                              
+                              final allBooks = snapshot.data ?? [];
+                              final folderBooks = allBooks
+                                  .where((book) => bookIds.contains(book.id))
+                                  .toList();
+
+                              if (folderBooks.isEmpty) {
+                                return Center(
+                                  child: Text(
+                                    'No books available in this folder',
+                                    style: AppTextStyles.regular.copyWith(
+                                      color: Colors.white.withOpacity(0.5),
+                                      fontSize: 12.sp,
+                                    ),
+                                  ),
+                                );
+                              }
+
+                              return GridView.builder(
+                                controller: scrollController,
+                                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: 3,
+                                  crossAxisSpacing: 12.w,
+                                  mainAxisSpacing: 16.h,
+                                  childAspectRatio: 0.52,
+                                ),
+                                itemCount: folderBooks.length,
+                                itemBuilder: (context, index) {
+                                  final book = folderBooks[index];
+                                  return GestureDetector(
+                                    onTap: () async {
+                                      if (mounted) {
+                                        AppRouter.routeTo(context, BookDetailScreen(book: book));
+                                      }
+                                    },
+                                    child: GlobalCard(
+                                      title: book.title,
+                                      author: book.author,
+                                      imageAsset: book.coverImageUrl,
+                                      listenTime: '${book.listenTime}m',
+                                      readTime: '${book.readTime}m',
+                                      book: book,
+                                    ),
+                                  );
+                                },
+                              );
+                            },
+                          ),
+                  ),
+                ],
+              ),
+            );
+          },
         );
       },
     );

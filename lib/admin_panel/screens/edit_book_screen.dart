@@ -633,6 +633,7 @@ class _EditBookScreenState extends State<EditBookScreen> {
         price: price,
         isPublished: widget.book.isPublished, // Keep original published status
         hasEverBeenPublished: widget.book.hasEverBeenPublished, // Keep original hasEverBeenPublished
+        position: widget.book.position, // Keep original position
         createdAt: widget.book.createdAt, // Keep original creation date
         updatedAt: DateTime.now(), // Update timestamp
       );

@@ -17,6 +17,9 @@ import 'pages/add_video_screen.dart';
 import 'pages/add_mp3_screen.dart';
 import 'pages/mp3_page.dart';
 import 'add_book_screen.dart';
+import 'pages/quiz_page.dart';
+import 'pages/add_quiz_screen.dart';
+import '../../admin_panel/screens/add_edit_folder_screen.dart';
 
 class LibraryScreen extends StatefulWidget {
   const LibraryScreen({super.key});
@@ -30,6 +33,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
   bool isAdmin = false;
   final GlobalKey<LibraryVideosPageState> _videoPageKey = GlobalKey();
   final GlobalKey<Mp3PageState> _mp3PageKey = GlobalKey();
+  final GlobalKey<QuizPageState> _quizPageKey = GlobalKey();
 
   @override
   void initState() {
@@ -57,6 +61,13 @@ class _LibraryScreenState extends State<LibraryScreen> {
     final state = _mp3PageKey.currentState;
     if (state != null) {
       await state.loadMp3s();
+    }
+  }
+
+  Future<void> _refreshQuizTab() async {
+    final state = _quizPageKey.currentState;
+    if (state != null) {
+      state.loadQuizzes();
     }
   }
 
@@ -100,13 +111,73 @@ class _LibraryScreenState extends State<LibraryScreen> {
                                 const AddMp3Screen(),
                               );
                               await _refreshMp3Tab();
+                            } else if (selectedTabIndex == 4) {
+                              await AppRouter.routeTo(
+                                context,
+                                const AddQuizScreen(),
+                              );
+                              await _refreshQuizTab();
+                            } else if (selectedTabIndex == 0) {
+                              // E-book tab: Show selector for E-book or Folder
+                              showModalBottomSheet(
+                                context: context,
+                                backgroundColor: AppColors.boxClr,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.vertical(top: Radius.circular(20.r)),
+                                ),
+                                builder: (context) => Container(
+                                  padding: EdgeInsets.all(20.w),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        'What would you like to create?',
+                                        style: AppTextStyles.lufgaMedium.copyWith(
+                                          color: Colors.white,
+                                          fontSize: 16.sp,
+                                        ),
+                                      ),
+                                      20.verticalSpace,
+                                      ListTile(
+                                        leading: Icon(Icons.library_books, color: AppColors.primaryColor, size: 24.sp),
+                                        title: Text(
+                                          'Add New E-Book',
+                                          style: AppTextStyles.medium.copyWith(color: Colors.white),
+                                        ),
+                                        onTap: () async {
+                                          Navigator.pop(context);
+                                          await AppRouter.routeTo(
+                                            context,
+                                            const AddBookScreen(initialType: 'ebook'),
+                                          );
+                                        },
+                                      ),
+                                      Divider(color: Colors.white.withOpacity(0.1)),
+                                      ListTile(
+                                        leading: Icon(Icons.folder, color: AppColors.primaryColor, size: 24.sp),
+                                        title: Text(
+                                          'Add New Folder',
+                                          style: AppTextStyles.medium.copyWith(color: Colors.white),
+                                        ),
+                                        onTap: () async {
+                                          Navigator.pop(context);
+                                          await AppRouter.routeTo(
+                                            context,
+                                            const AddEditFolderScreen(),
+                                          );
+                                        },
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
                             } else {
                               await AppRouter.routeTo(
                                 context,
                                 AddBookScreen(
-                                  initialType: selectedTabIndex == 0
-                                      ? 'ebook'
-                                      : 'audiobook',
+                                  initialType: selectedTabIndex == 2
+                                      ? 'audiobook'
+                                      : 'ebook',
                                 ),
                               );
                             }
@@ -162,9 +233,11 @@ class _LibraryScreenState extends State<LibraryScreen> {
                     await _refreshVideoTab();
                   } else if (index == 3) {
                     await _refreshMp3Tab();
+                  } else if (index == 4) {
+                    await _refreshQuizTab();
                   }
                 },
-                tabs: ['E-book', 'Videos', 'Audiobook', 'Songs'],
+                tabs: ['E-book', 'Videos', 'Audiobook', 'Songs', 'Quiz'],
               ),
             ),
             20.verticalSpace,
@@ -178,6 +251,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
                   LibraryVideosPage(key: _videoPageKey),
                   AudiobookPage(),
                   Mp3Page(key: _mp3PageKey),
+                  QuizPage(key: _quizPageKey),
                 ],
               ),
             ),

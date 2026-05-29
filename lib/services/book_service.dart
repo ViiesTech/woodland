@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:the_woodlands_series/admin_panel/models/book_model.dart';
 
@@ -24,7 +25,7 @@ class BookService {
         .orderBy('createdAt', descending: true)
         .snapshots()
         .map((snapshot) {
-          return snapshot.docs
+          final books = snapshot.docs
               .map(
                 (doc) => BookModel.fromFirestore(
                   doc.id,
@@ -32,6 +33,14 @@ class BookService {
                 ),
               )
               .toList();
+          books.sort((a, b) {
+            final posCompare = a.position.compareTo(b.position);
+            if (posCompare != 0) {
+              return posCompare;
+            }
+            return b.createdAt.compareTo(a.createdAt);
+          });
+          return books;
         });
   }
 
@@ -45,7 +54,7 @@ class BookService {
         .orderBy('createdAt', descending: true)
         .snapshots()
         .map((snapshot) {
-          return snapshot.docs
+          final books = snapshot.docs
               .map(
                 (doc) => BookModel.fromFirestore(
                   doc.id,
@@ -53,6 +62,14 @@ class BookService {
                 ),
               )
               .toList();
+          books.sort((a, b) {
+            final posCompare = a.position.compareTo(b.position);
+            if (posCompare != 0) {
+              return posCompare;
+            }
+            return b.createdAt.compareTo(a.createdAt);
+          });
+          return books;
         });
   }
 
@@ -65,7 +82,7 @@ class BookService {
         .orderBy('createdAt', descending: true)
         .snapshots()
         .map((snapshot) {
-          return snapshot.docs
+          final books = snapshot.docs
               .map(
                 (doc) => BookModel.fromFirestore(
                   doc.id,
@@ -73,6 +90,14 @@ class BookService {
                 ),
               )
               .toList();
+          books.sort((a, b) {
+            final posCompare = a.position.compareTo(b.position);
+            if (posCompare != 0) {
+              return posCompare;
+            }
+            return b.createdAt.compareTo(a.createdAt);
+          });
+          return books;
         });
   }
 
@@ -114,6 +139,25 @@ class BookService {
       await _firestore.collection('books').doc(bookId).update(updateData);
     } catch (e) {
       print('Error updating book: $e');
+      rethrow;
+    }
+  }
+
+  // Update positions of multiple books in a batch
+  static Future<void> updateBookPositions(List<String> bookIds) async {
+    try {
+      final batch = _firestore.batch();
+      for (int i = 0; i < bookIds.length; i++) {
+        final docRef = _firestore.collection('books').doc(bookIds[i]);
+        batch.update(docRef, {
+          'position': i,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      }
+      await batch.commit();
+      print('✅ Batch updated ${bookIds.length} book positions successfully.');
+    } catch (e) {
+      print('❌ Error batch updating book positions: $e');
       rethrow;
     }
   }
@@ -202,7 +246,7 @@ class BookService {
         .orderBy('createdAt', descending: true)
         .snapshots()
         .map((snapshot) {
-          return snapshot.docs
+          final books = snapshot.docs
               .map(
                 (doc) => BookModel.fromFirestore(
                   doc.id,
@@ -210,6 +254,14 @@ class BookService {
                 ),
               )
               .toList();
+          books.sort((a, b) {
+            final posCompare = a.position.compareTo(b.position);
+            if (posCompare != 0) {
+              return posCompare;
+            }
+            return b.createdAt.compareTo(a.createdAt);
+          });
+          return books;
         });
   }
 
@@ -489,5 +541,239 @@ class BookService {
       books.sort((a, b) => b.createdAt.compareTo(a.createdAt));
       return books.take(limit).toList();
     });
+  }
+
+  // ==========================================
+  // FOLDER / COLLECTION SPECIFIC METHODS
+  // ==========================================
+
+  // Add a new folder
+  static Future<String> addFolder(BookModel folder) async {
+    try {
+      final docRef = await _firestore
+          .collection('folders')
+          .add(folder.toFirestore());
+      return docRef.id;
+    } catch (e) {
+      print('Error adding folder: $e');
+      rethrow;
+    }
+  }
+
+  // Update a folder
+  static Future<void> updateFolder(String folderId, BookModel folder) async {
+    try {
+      await _firestore
+          .collection('folders')
+          .doc(folderId)
+          .update(folder.toFirestore());
+    } catch (e) {
+      print('Error updating folder: $e');
+      rethrow;
+    }
+  }
+
+  // Delete a folder
+  static Future<void> deleteFolder(String folderId) async {
+    try {
+      await _firestore.collection('folders').doc(folderId).delete();
+    } catch (e) {
+      print('Error deleting folder: $e');
+      rethrow;
+    }
+  }
+
+  // Get a single folder by ID
+  static Future<BookModel?> getFolderById(String folderId) async {
+    try {
+      final doc = await _firestore.collection('folders').doc(folderId).get();
+      if (doc.exists) {
+        return BookModel.fromFirestore(doc.id, doc.data()!);
+      }
+      return null;
+    } catch (e) {
+      print('Error getting folder: $e');
+      return null;
+    }
+  }
+
+  // Get all folders (including unpublished for admin)
+  static Stream<List<BookModel>> getAllFolders() {
+    return _firestore
+        .collection('folders')
+        .snapshots()
+        .map((snapshot) {
+          final folders = snapshot.docs
+              .map(
+                (doc) => BookModel.fromFirestore(
+                  doc.id,
+                  doc.data(),
+                ),
+              )
+              .toList();
+          folders.sort((a, b) {
+            final posCompare = a.position.compareTo(b.position);
+            if (posCompare != 0) {
+              return posCompare;
+            }
+            return b.createdAt.compareTo(a.createdAt);
+          });
+          return folders;
+        });
+  }
+
+  // Get only published folders for regular users
+  static Stream<List<BookModel>> getPublishedFolders() {
+    return _firestore
+        .collection('folders')
+        .where('isPublished', isEqualTo: true)
+        .snapshots()
+        .map((snapshot) {
+          final folders = snapshot.docs
+              .map(
+                (doc) => BookModel.fromFirestore(
+                  doc.id,
+                  doc.data(),
+                ),
+              )
+              .toList();
+          folders.sort((a, b) {
+            final posCompare = a.position.compareTo(b.position);
+            if (posCompare != 0) {
+              return posCompare;
+            }
+            return b.createdAt.compareTo(a.createdAt);
+          });
+          return folders;
+        });
+  }
+
+  // Combined stream of ebooks and folders (sorted)
+  static Stream<List<BookModel>> getEbooksAndFoldersStream({required bool isAdmin}) {
+    final ebooksStream = isAdmin 
+        ? getAllBooksByType(BookType.ebook)
+        : getBooksByType(BookType.ebook);
+        
+    final foldersStream = isAdmin
+        ? getAllFolders()
+        : getPublishedFolders();
+
+    final controller = StreamController<List<BookModel>>();
+    List<BookModel> latestEbooks = [];
+    List<BookModel> latestFolders = [];
+
+    void emitCombined() {
+      final combined = [...latestEbooks, ...latestFolders];
+      combined.sort((a, b) {
+        final posCompare = a.position.compareTo(b.position);
+        if (posCompare != 0) {
+          return posCompare;
+        }
+        return b.createdAt.compareTo(a.createdAt);
+      });
+      controller.add(combined);
+    }
+
+    final ebooksSub = ebooksStream.listen(
+      (ebooks) {
+        latestEbooks = ebooks;
+        emitCombined();
+      },
+      onError: (err) {
+        if (!controller.isClosed) controller.addError(err);
+      },
+    );
+
+    final foldersSub = foldersStream.listen(
+      (folders) {
+        latestFolders = folders;
+        emitCombined();
+      },
+      onError: (err) {
+        if (!controller.isClosed) controller.addError(err);
+      },
+    );
+
+    controller.onCancel = () {
+      ebooksSub.cancel();
+      foldersSub.cancel();
+    };
+
+    return controller.stream;
+  }
+
+  // Combined search stream of ebooks and folders (sorted)
+  static Stream<List<BookModel>> searchEbooksAndFoldersStream(
+    String query, {
+    required bool isAdmin,
+  }) {
+    final ebooksStream = isAdmin
+        ? searchAllBooks(query, BookType.ebook)
+        : searchBooks(query, BookType.ebook);
+
+    final foldersStream = _firestore
+        .collection('folders')
+        .snapshots()
+        .map((snapshot) {
+          final folders = snapshot.docs
+              .map(
+                (doc) => BookModel.fromFirestore(
+                  doc.id,
+                  doc.data(),
+                ),
+              )
+              .toList();
+
+          final queryLower = query.toLowerCase();
+          return folders.where((folder) {
+            final isMatch = folder.title.toLowerCase().contains(queryLower) ||
+                folder.description.toLowerCase().contains(queryLower);
+            final isVisible = isAdmin ? true : folder.isPublished;
+            return isMatch && isVisible;
+          }).toList();
+        });
+
+    final controller = StreamController<List<BookModel>>();
+    List<BookModel> latestEbooks = [];
+    List<BookModel> latestFolders = [];
+
+    void emitCombined() {
+      final combined = [...latestEbooks, ...latestFolders];
+      combined.sort((a, b) {
+        final posCompare = a.position.compareTo(b.position);
+        if (posCompare != 0) {
+          return posCompare;
+        }
+        return b.createdAt.compareTo(a.createdAt);
+      });
+      controller.add(combined);
+    }
+
+    final ebooksSub = ebooksStream.listen(
+      (ebooks) {
+        latestEbooks = ebooks;
+        emitCombined();
+      },
+      onError: (err) {
+        if (!controller.isClosed) controller.addError(err);
+      },
+    );
+
+    final foldersSub = foldersStream.listen(
+      (folders) {
+        latestFolders = folders;
+        emitCombined();
+      },
+      onError: (err) {
+        if (!controller.isClosed) controller.addError(err);
+      },
+    );
+
+    controller.onCancel = () {
+      ebooksSub.cancel();
+      foldersSub.cancel();
+    };
+
+    return controller.stream;
   }
 }

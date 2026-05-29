@@ -3,9 +3,12 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:the_woodlands_series/components/resource/app_colors.dart';
 import 'package:the_woodlands_series/components/resource/app_textstyle.dart';
 import 'package:the_woodlands_series/components/textfield/primary_textfield.dart';
+import 'package:the_woodlands_series/services/book_service.dart';
 import '../models/book_model.dart';
 import '../services/firebase_service.dart';
 import 'add_book_screen.dart';
+import 'edit_book_screen.dart';
+import 'add_edit_folder_screen.dart';
 
 class ManageBooksScreen extends StatefulWidget {
   const ManageBooksScreen({super.key});
@@ -77,10 +80,58 @@ class _ManageBooksScreenState extends State<ManageBooksScreen> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const AddBookScreen()),
-          ).then((_) => _loadBooks());
+          showModalBottomSheet(
+            context: context,
+            backgroundColor: AppColors.boxClr,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.vertical(top: Radius.circular(20.r)),
+            ),
+            builder: (context) => Container(
+              padding: EdgeInsets.all(20.w),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'What would you like to create?',
+                    style: AppTextStyles.lufgaMedium.copyWith(
+                      color: Colors.white,
+                      fontSize: 16.sp,
+                    ),
+                  ),
+                  20.verticalSpace,
+                  ListTile(
+                    leading: Icon(Icons.library_books, color: AppColors.primaryColor, size: 24.sp),
+                    title: Text(
+                      'Add New E-Book',
+                      style: AppTextStyles.medium.copyWith(color: Colors.white),
+                    ),
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const AddBookScreen()),
+                      ).then((_) => _loadBooks());
+                    },
+                  ),
+                  Divider(color: Colors.white.withOpacity(0.1)),
+                  ListTile(
+                    leading: Icon(Icons.folder, color: AppColors.primaryColor, size: 24.sp),
+                    title: Text(
+                      'Add New Folder',
+                      style: AppTextStyles.medium.copyWith(color: Colors.white),
+                    ),
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const AddEditFolderScreen()),
+                      ).then((_) => _loadBooks());
+                    },
+                  ),
+                ],
+              ),
+            ),
+          );
         },
         backgroundColor: AppColors.primaryColor,
         child: Icon(Icons.add, color: Colors.white),
@@ -233,16 +284,56 @@ class _ManageBooksScreenState extends State<ManageBooksScreen> {
   }
 
   Widget _buildBooksList(bool isMobile) {
+    final bool canReorder = _searchQuery.isEmpty && _selectedFilter == 'All';
+
     if (isMobile) {
-      // Mobile: Single column list
-      return ListView.builder(
-        padding: EdgeInsets.all(12.w),
-        itemCount: _filteredBooks.length,
-        itemBuilder: (context, index) {
-          final book = _filteredBooks[index];
-          return _buildBookCard(book, isMobile);
-        },
-      );
+      if (canReorder) {
+        return ReorderableListView.builder(
+          buildDefaultDragHandles: false,
+          padding: EdgeInsets.all(12.w),
+          itemCount: _filteredBooks.length,
+          onReorder: (oldIndex, newIndex) async {
+            setState(() {
+              if (oldIndex < newIndex) {
+                newIndex -= 1;
+              }
+              final BookModel item = _filteredBooks.removeAt(oldIndex);
+              _filteredBooks.insert(newIndex, item);
+
+              // Only sync _books list if they are different instances in memory
+              if (!identical(_books, _filteredBooks)) {
+                final booksIndex = _books.indexOf(item);
+                if (booksIndex != -1) {
+                  _books.removeAt(booksIndex);
+                  _books.insert(newIndex, item);
+                }
+              }
+            });
+
+            // Asynchronously save positions to Firestore in the background
+            try {
+              final bookIds = _filteredBooks.map((b) => b.id).toList();
+              await BookService.updateBookPositions(bookIds);
+            } catch (e) {
+              _showSnackBar('Failed to save order: $e');
+            }
+          },
+          itemBuilder: (context, index) {
+            final book = _filteredBooks[index];
+            return _buildBookCard(book, isMobile, index: index, canReorder: canReorder);
+          },
+        );
+      } else {
+        // Mobile: Regular list when search/filters are active
+        return ListView.builder(
+          padding: EdgeInsets.all(12.w),
+          itemCount: _filteredBooks.length,
+          itemBuilder: (context, index) {
+            final book = _filteredBooks[index];
+            return _buildBookCard(book, isMobile, index: index, canReorder: false);
+          },
+        );
+      }
     } else {
       // Desktop/Tablet: Grid layout
       return GridView.builder(
@@ -256,14 +347,15 @@ class _ManageBooksScreenState extends State<ManageBooksScreen> {
         itemCount: _filteredBooks.length,
         itemBuilder: (context, index) {
           final book = _filteredBooks[index];
-          return _buildBookCard(book, isMobile);
+          return _buildBookCard(book, isMobile, index: index, canReorder: false);
         },
       );
     }
   }
 
-  Widget _buildBookCard(BookModel book, bool isMobile) {
+  Widget _buildBookCard(BookModel book, bool isMobile, {required int index, required bool canReorder}) {
     return Container(
+      key: ValueKey(book.id),
       margin: EdgeInsets.only(bottom: 12.h),
       padding: EdgeInsets.all(16.w),
       decoration: BoxDecoration(
@@ -279,17 +371,32 @@ class _ManageBooksScreenState extends State<ManageBooksScreen> {
       ),
       child: Row(
         children: [
+          if (canReorder) ...[
+            ReorderableDragStartListener(
+              index: index,
+              child: Container(
+                padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 16.h),
+                color: Colors.transparent, // Ensures the entire padded region is touch-sensitive
+                child: Icon(
+                  Icons.drag_indicator,
+                  color: Colors.white.withOpacity(0.5),
+                  size: 24.sp,
+                ),
+              ),
+            ),
+          ],
+
           // Book Cover Placeholder
           Container(
             width: 60.w,
             height: 80.h,
             decoration: BoxDecoration(
-              color: AppColors.primaryColor.withOpacity(0.2),
+              color: book.isFolder ? Colors.deepPurple.withOpacity(0.2) : AppColors.primaryColor.withOpacity(0.2),
               borderRadius: BorderRadius.circular(8.r),
             ),
             child: Icon(
-              Icons.book,
-              color: AppColors.primaryColor,
+              book.isFolder ? Icons.folder : Icons.book,
+              color: book.isFolder ? Colors.deepPurpleAccent : AppColors.primaryColor,
               size: 24.sp,
             ),
           ),
@@ -312,7 +419,7 @@ class _ManageBooksScreenState extends State<ManageBooksScreen> {
                 ),
                 4.verticalSpace,
                 Text(
-                  book.author,
+                  book.isFolder ? 'Collection' : book.author,
                   style: AppTextStyles.small.copyWith(
                     color: Colors.white.withOpacity(0.7),
                     fontSize: 12.sp,
@@ -336,10 +443,27 @@ class _ManageBooksScreenState extends State<ManageBooksScreen> {
                       ),
                     ),
                     8.horizontalSpace,
+                    if (book.isFolder) ...[
+                      Container(
+                        padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+                        decoration: BoxDecoration(
+                          color: Colors.deepPurple,
+                          borderRadius: BorderRadius.circular(12.r),
+                        ),
+                        child: Text(
+                          '${book.bookIds?.length ?? 0} Books',
+                          style: AppTextStyles.small.copyWith(
+                            color: Colors.white,
+                            fontSize: 10.sp,
+                          ),
+                        ),
+                      ),
+                      8.horizontalSpace,
+                    ],
                     Text(
                       book.category,
                       style: AppTextStyles.small.copyWith(
-                        color: AppColors.primaryColor,
+                        color: book.isFolder ? Colors.purpleAccent : AppColors.primaryColor,
                         fontSize: 10.sp,
                       ),
                     ),
@@ -383,8 +507,18 @@ class _ManageBooksScreenState extends State<ManageBooksScreen> {
   }
 
   void _editBook(BookModel book) {
-    // Navigate to edit screen (you can create an EditBookScreen similar to AddBookScreen)
-    _showSnackBar('Edit functionality coming soon!');
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => book.isFolder
+            ? AddEditFolderScreen(folder: book)
+            : EditBookScreen(book: book),
+      ),
+    ).then((updated) {
+      if (updated == true) {
+        _loadBooks();
+      }
+    });
   }
 
   void _deleteBook(BookModel book) {

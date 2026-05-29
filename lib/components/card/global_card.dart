@@ -43,11 +43,27 @@ class GlobalCard extends StatefulWidget {
 class _GlobalCardState extends State<GlobalCard> {
   bool _isUpdating = false;
   late bool _isPublished;
+  String? _folderCoverUrl;
 
   @override
   void initState() {
     super.initState();
     _isPublished = widget.book?.isPublished ?? false;
+    _fetchFolderCover();
+  }
+
+  void _fetchFolderCover() {
+    if (widget.book?.isFolder == true &&
+        widget.book!.bookIds != null &&
+        widget.book!.bookIds!.isNotEmpty) {
+      BookService.getBookById(widget.book!.bookIds!.first).then((book) {
+        if (mounted && book != null && book.coverImageUrl.isNotEmpty) {
+          setState(() {
+            _folderCoverUrl = book.coverImageUrl;
+          });
+        }
+      }).catchError((_) {});
+    }
   }
 
   @override
@@ -62,7 +78,7 @@ class _GlobalCardState extends State<GlobalCard> {
   Widget build(BuildContext context) {
     // Determine which time to show based on book type
     final showListenTime = widget.book?.type == BookType.audiobook;
-    final showReadTime = widget.book?.type == BookType.ebook;
+    final showReadTime = widget.book?.type == BookType.ebook && widget.book?.isFolder != true;
 
     return SizedBox(
       width: 122.w,
@@ -82,62 +98,167 @@ class _GlobalCardState extends State<GlobalCard> {
                 ),
                 child: Stack(
                   children: [
-                    // Background Image - supports both asset and network
-                    Container(
-                      height: 119.h,
-                      width: double.infinity,
-                      decoration: BoxDecoration(
-                        border: Border.all(
-                          color: const Color.fromARGB(31, 141, 141, 141),
-                        ),
-                        borderRadius: BorderRadius.circular(14.r),
-                      ),
-                      child: widget.imageAsset.startsWith('http')
-                          ? ClipRRect(
+                    // Folder visual container OR standard book cover
+                    widget.book?.isFolder == true
+                        ? Container(
+                            height: 119.h,
+                            width: double.infinity,
+                            decoration: BoxDecoration(
                               borderRadius: BorderRadius.circular(14.r),
-                              child: CachedNetworkImage(
-                                imageUrl: widget.imageAsset,
-                                width: double.infinity,
-                                height: 119.h,
-                                fit: BoxFit.contain,
-                                progressIndicatorBuilder:
-                                    (context, url, progress) => Container(
+                              gradient: _folderCoverUrl == null
+                                  ? LinearGradient(
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                      colors: [
+                                        const Color(0xFF2C1B4D),
+                                        const Color(0xFF6B2D5C),
+                                      ],
+                                    )
+                                  : null,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.2),
+                                  blurRadius: 4.r,
+                                  offset: Offset(0, 2.h),
+                                ),
+                              ],
+                            ),
+                            child: Stack(
+                              children: [
+                                // Show first book cover or fallback folder icon
+                                if (_folderCoverUrl != null && _folderCoverUrl!.startsWith('http'))
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(14.r),
+                                    child: CachedNetworkImage(
+                                      imageUrl: _folderCoverUrl!,
                                       width: double.infinity,
                                       height: 119.h,
-                                      color: Colors.grey[800],
-                                      child: Center(
-                                        child: CircularProgressIndicator(
-                                          value: progress.progress,
-                                          color: Colors.orange,
-                                          strokeWidth: 2,
-                                        ),
+                                      fit: BoxFit.contain,
+                                      progressIndicatorBuilder:
+                                          (context, url, progress) => Container(
+                                            width: double.infinity,
+                                            height: 119.h,
+                                            color: Colors.grey[800],
+                                            child: Center(
+                                              child: CircularProgressIndicator(
+                                                value: progress.progress,
+                                                color: Colors.orange,
+                                                strokeWidth: 2,
+                                              ),
+                                            ),
+                                          ),
+                                      errorWidget: (context, url, error) =>
+                                          _buildFolderFallbackIcon(),
+                                      memCacheWidth: 244,
+                                      memCacheHeight: 238,
+                                    ),
+                                  )
+                                else
+                                  Center(child: _buildFolderFallbackIcon()),
+                                // Collection badge overlay at bottom
+                                Positioned(
+                                  bottom: 0,
+                                  left: 0,
+                                  right: 0,
+                                  child: Container(
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: 8.w,
+                                      vertical: 5.h,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        begin: Alignment.bottomCenter,
+                                        end: Alignment.topCenter,
+                                        colors: [
+                                          Colors.black.withOpacity(0.85),
+                                          Colors.black.withOpacity(0.0),
+                                        ],
+                                      ),
+                                      borderRadius: BorderRadius.only(
+                                        bottomLeft: Radius.circular(14.r),
+                                        bottomRight: Radius.circular(14.r),
                                       ),
                                     ),
-                                errorWidget: (context, url, error) {
-                                  print(
-                                    'Error loading image: $url, Error: $error',
-                                  );
-                                  return Container(
-                                    width: double.infinity,
-                                    height: 119.h,
-                                    color: Colors.grey[800],
-                                    child: Icon(
-                                      Icons.image_not_supported,
-                                      color: Colors.grey[600],
-                                      size: 40.sp,
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Icon(
+                                          Icons.folder,
+                                          color: AppColors.primaryColor,
+                                          size: 10.sp,
+                                        ),
+                                        4.horizontalSpace,
+                                        Text(
+                                          '${widget.book!.bookIds?.length ?? 0} Books',
+                                          style: AppTextStyles.small.copyWith(
+                                            color: Colors.white,
+                                            fontSize: 8.sp,
+                                            fontWeight: FontWeight.bold,
+                                            letterSpacing: 0.2,
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                  );
-                                },
-                                fadeInDuration: Duration(milliseconds: 300),
-                                fadeOutDuration: Duration(milliseconds: 100),
-                                memCacheWidth:
-                                    244, // 122.w * 2 for better quality
-                                memCacheHeight:
-                                    238, // 119.h * 2 for better quality
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        : Container(
+                            height: 119.h,
+                            width: double.infinity,
+                            decoration: BoxDecoration(
+                              border: Border.all(
+                                color: const Color.fromARGB(31, 141, 141, 141),
                               ),
-                            )
-                          : null,
-                    ),
+                              borderRadius: BorderRadius.circular(14.r),
+                            ),
+                            child: widget.imageAsset.startsWith('http')
+                                ? ClipRRect(
+                                    borderRadius: BorderRadius.circular(14.r),
+                                    child: CachedNetworkImage(
+                                      imageUrl: widget.imageAsset,
+                                      width: double.infinity,
+                                      height: 119.h,
+                                      fit: BoxFit.contain,
+                                      progressIndicatorBuilder:
+                                          (context, url, progress) => Container(
+                                            width: double.infinity,
+                                            height: 119.h,
+                                            color: Colors.grey[800],
+                                            child: Center(
+                                              child: CircularProgressIndicator(
+                                                value: progress.progress,
+                                                color: Colors.orange,
+                                                strokeWidth: 2,
+                                              ),
+                                            ),
+                                          ),
+                                      errorWidget: (context, url, error) {
+                                        print(
+                                          'Error loading image: $url, Error: $error',
+                                        );
+                                        return Container(
+                                          width: double.infinity,
+                                          height: 119.h,
+                                          color: Colors.grey[800],
+                                          child: Icon(
+                                            Icons.image_not_supported,
+                                            color: Colors.grey[600],
+                                            size: 40.sp,
+                                          ),
+                                        );
+                                      },
+                                      fadeInDuration: Duration(milliseconds: 300),
+                                      fadeOutDuration: Duration(milliseconds: 100),
+                                      memCacheWidth:
+                                          244, // 122.w * 2 for better quality
+                                      memCacheHeight:
+                                          238, // 119.h * 2 for better quality
+                                    ),
+                                  )
+                                : null,
+                          ),
                     // Blur Overlay
                     if (widget.blur)
                       ClipRRect(
@@ -178,9 +299,9 @@ class _GlobalCardState extends State<GlobalCard> {
               ),
               4.verticalSpace,
               Text(
-                widget.author,
+                widget.book?.isFolder == true ? 'Collection' : widget.author,
                 style: AppTextStyles.regular.copyWith(
-                  color: Colors.white,
+                  color: Colors.white.withOpacity(0.7),
                   fontSize: 10.sp,
                 ),
                 maxLines: 1,
@@ -206,20 +327,22 @@ class _GlobalCardState extends State<GlobalCard> {
                           fontSize: 8.sp,
                         ),
                       ),
-                      8.horizontalSpace,
-                      Icon(
-                        Icons.menu_book,
-                        size: 10.sp,
-                        color: Colors.grey[400],
-                      ),
-                      2.horizontalSpace,
-                      Text(
-                        '${widget.book!.readCount} read',
-                        style: AppTextStyles.regular.copyWith(
+                      if (widget.book!.isFolder != true) ...[
+                        8.horizontalSpace,
+                        Icon(
+                          Icons.menu_book,
+                          size: 10.sp,
                           color: Colors.grey[400],
-                          fontSize: 8.sp,
                         ),
-                      ),
+                        2.horizontalSpace,
+                        Text(
+                          '${widget.book!.readCount} read',
+                          style: AppTextStyles.regular.copyWith(
+                            color: Colors.grey[400],
+                            fontSize: 8.sp,
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ],
@@ -340,6 +463,19 @@ class _GlobalCardState extends State<GlobalCard> {
     );
   }
 
+  Widget _buildFolderFallbackIcon() {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(
+          Icons.folder_open,
+          color: Colors.white,
+          size: 38.sp,
+        ),
+      ],
+    );
+  }
+
   void _handlePublishToggle(bool newValue, bool isAdmin) {
     if (!isAdmin || widget.book == null) return;
 
@@ -426,26 +562,34 @@ class _GlobalCardState extends State<GlobalCard> {
         hasEverBeenPublished: widget.book!.hasEverBeenPublished,
         createdAt: widget.book!.createdAt,
         updatedAt: DateTime.now(),
+        isFolder: widget.book!.isFolder,
+        bookIds: widget.book!.bookIds,
       );
 
-      await BookService.updateBook(widget.book!.id, updatedBook);
+      if (widget.book!.isFolder) {
+        await BookService.updateFolder(widget.book!.id, updatedBook);
+      } else {
+        await BookService.updateBook(widget.book!.id, updatedBook);
+      }
 
       setState(() {
         _isPublished = isPublished;
         _isUpdating = false;
       });
 
+      final typeLabel = widget.book!.isFolder ? 'Collection' : 'Book';
       CustomToast.showSuccess(
         context,
         isPublished
-            ? 'Book published successfully!'
-            : 'Book unpublished successfully!',
+            ? '$typeLabel published successfully!'
+            : '$typeLabel unpublished successfully!',
       );
     } catch (e) {
       setState(() {
         _isUpdating = false;
       });
-      CustomToast.showError(context, 'Error updating book status: $e');
+      final typeLabel = widget.book!.isFolder ? 'collection' : 'book';
+      CustomToast.showError(context, 'Error updating $typeLabel status: $e');
     }
   }
 }

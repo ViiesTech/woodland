@@ -92,11 +92,31 @@ class FirebaseService {
   static Future<List<BookModel>> getAllBooks() async {
     try {
       final querySnapshot = await _firestore.collection(_booksCollection).get();
-      return querySnapshot.docs.map((doc) {
+      final books = querySnapshot.docs.map((doc) {
         final data = doc.data();
         data['id'] = doc.id;
         return BookModel.fromMap(data);
       }).toList();
+
+      // Fetch folders from separate collection
+      final foldersSnapshot = await _firestore.collection('folders').get();
+      final folders = foldersSnapshot.docs.map((doc) {
+        final data = doc.data();
+        data['id'] = doc.id;
+        return BookModel.fromMap(data);
+      }).toList();
+
+      final combined = [...books, ...folders];
+
+      // Sort client-side: position ascending, fallback to createdAt descending
+      combined.sort((a, b) {
+        final posCompare = a.position.compareTo(b.position);
+        if (posCompare != 0) {
+          return posCompare;
+        }
+        return b.createdAt.compareTo(a.createdAt);
+      });
+      return combined;
     } catch (e) {
       throw Exception('Failed to get books: $e');
     }
@@ -115,8 +135,9 @@ class FirebaseService {
   static Future<void> deleteBook(String bookId) async {
     try {
       await _firestore.collection(_booksCollection).doc(bookId).delete();
+      await _firestore.collection('folders').doc(bookId).delete();
     } catch (e) {
-      throw Exception('Failed to delete book: $e');
+      throw Exception('Failed to delete: $e');
     }
   }
 

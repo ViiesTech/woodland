@@ -29,8 +29,11 @@ class BookModel {
   final bool
   hasEverBeenPublished; // Track if book has ever been published (for "Coming Soon" logic)
   final double price; // Price of the book in USD
+  final int position; // Display order position of the book
   final DateTime createdAt;
   final DateTime updatedAt;
+  final bool isFolder;
+  final List<String>? bookIds;
 
   BookModel({
     required this.id,
@@ -53,8 +56,11 @@ class BookModel {
     required this.isPublished,
     this.hasEverBeenPublished = false,
     this.price = 0.0,
+    this.position = 0,
     required this.createdAt,
     required this.updatedAt,
+    this.isFolder = false,
+    this.bookIds,
   });
 
   Map<String, dynamic> toFirestore() {
@@ -78,8 +84,11 @@ class BookModel {
       'isPublished': isPublished,
       'hasEverBeenPublished': hasEverBeenPublished,
       'price': price,
+      'position': position,
       'createdAt': Timestamp.fromDate(createdAt),
       'updatedAt': Timestamp.fromDate(updatedAt),
+      'isFolder': isFolder,
+      'bookIds': bookIds,
     };
   }
 
@@ -113,8 +122,13 @@ class BookModel {
       isPublished: data['isPublished'] as bool? ?? false,
       hasEverBeenPublished: data['hasEverBeenPublished'] as bool? ?? false,
       price: (data['price'] as num?)?.toDouble() ?? 0.0,
+      position: (data['position'] as num?)?.toInt() ?? 0,
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       updatedAt: (data['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      isFolder: (data['isFolder'] as bool? ?? false) ||
+                (data['category'] as String? ?? '') == 'Folder' ||
+                (data['coverImageUrl'] as String? ?? '') == 'folder',
+      bookIds: data['bookIds'] != null ? List<String>.from(data['bookIds'] as List) : null,
     );
   }
 
@@ -141,8 +155,11 @@ class BookModel {
       'isPublished': isPublished,
       'hasEverBeenPublished': hasEverBeenPublished,
       'price': price,
+      'position': position,
       'createdAt': createdAt.millisecondsSinceEpoch,
       'updatedAt': updatedAt.millisecondsSinceEpoch,
+      'isFolder': isFolder,
+      'bookIds': bookIds,
     };
   }
 
@@ -176,8 +193,13 @@ class BookModel {
       isPublished: map['isPublished'] ?? false,
       hasEverBeenPublished: map['hasEverBeenPublished'] ?? false,
       price: (map['price'] as num?)?.toDouble() ?? 0.0,
+      position: (map['position'] as num?)?.toInt() ?? 0,
       createdAt: DateTime.fromMillisecondsSinceEpoch(map['createdAt'] ?? 0),
       updatedAt: DateTime.fromMillisecondsSinceEpoch(map['updatedAt'] ?? 0),
+      isFolder: (map['isFolder'] as bool? ?? false) ||
+                (map['category'] as String? ?? '') == 'Folder' ||
+                (map['coverImageUrl'] as String? ?? '') == 'folder',
+      bookIds: map['bookIds'] != null ? List<String>.from(map['bookIds'] as List) : null,
     );
   }
 }
