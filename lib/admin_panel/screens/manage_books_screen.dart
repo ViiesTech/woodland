@@ -286,45 +286,43 @@ class _ManageBooksScreenState extends State<ManageBooksScreen> {
   Widget _buildBooksList(bool isMobile) {
     final bool canReorder = _searchQuery.isEmpty && _selectedFilter == 'All';
 
-    if (isMobile) {
-      if (canReorder) {
-        return ReorderableListView.builder(
-          buildDefaultDragHandles: false,
-          padding: EdgeInsets.all(12.w),
-          itemCount: _filteredBooks.length,
-          onReorder: (oldIndex, newIndex) async {
-            setState(() {
-              if (oldIndex < newIndex) {
-                newIndex -= 1;
-              }
-              final BookModel item = _filteredBooks.removeAt(oldIndex);
-              _filteredBooks.insert(newIndex, item);
-
-              // Only sync _books list if they are different instances in memory
-              if (!identical(_books, _filteredBooks)) {
-                final booksIndex = _books.indexOf(item);
-                if (booksIndex != -1) {
-                  _books.removeAt(booksIndex);
-                  _books.insert(newIndex, item);
-                }
-              }
-            });
-
-            // Asynchronously save positions to Firestore in the background
-            try {
-              final bookIds = _filteredBooks.map((b) => b.id).toList();
-              await BookService.updateBookPositions(bookIds);
-            } catch (e) {
-              _showSnackBar('Failed to save order: $e');
+    if (canReorder) {
+      return ReorderableListView.builder(
+        buildDefaultDragHandles: false,
+        padding: EdgeInsets.all(12.w),
+        itemCount: _filteredBooks.length,
+        onReorder: (oldIndex, newIndex) async {
+          setState(() {
+            if (oldIndex < newIndex) {
+              newIndex -= 1;
             }
-          },
-          itemBuilder: (context, index) {
-            final book = _filteredBooks[index];
-            return _buildBookCard(book, isMobile, index: index, canReorder: canReorder);
-          },
-        );
-      } else {
-        // Mobile: Regular list when search/filters are active
+            final BookModel item = _filteredBooks.removeAt(oldIndex);
+            _filteredBooks.insert(newIndex, item);
+
+            // Only sync _books list if they are different instances in memory
+            if (!identical(_books, _filteredBooks)) {
+              final booksIndex = _books.indexOf(item);
+              if (booksIndex != -1) {
+                _books.removeAt(booksIndex);
+                _books.insert(newIndex, item);
+              }
+            }
+          });
+
+          // Asynchronously save positions to Firestore in the background
+          try {
+            await BookService.updateBookPositions(_filteredBooks);
+          } catch (e) {
+            _showSnackBar('Failed to save order: $e');
+          }
+        },
+        itemBuilder: (context, index) {
+          final book = _filteredBooks[index];
+          return _buildBookCard(book, isMobile, index: index, canReorder: canReorder);
+        },
+      );
+    } else {
+      if (isMobile) {
         return ListView.builder(
           padding: EdgeInsets.all(12.w),
           itemCount: _filteredBooks.length,
@@ -333,23 +331,23 @@ class _ManageBooksScreenState extends State<ManageBooksScreen> {
             return _buildBookCard(book, isMobile, index: index, canReorder: false);
           },
         );
+      } else {
+        // Desktop/Tablet: Grid layout when search/filters are active
+        return GridView.builder(
+          padding: EdgeInsets.all(16.w),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            childAspectRatio: 1.2,
+            crossAxisSpacing: 16.w,
+            mainAxisSpacing: 16.h,
+          ),
+          itemCount: _filteredBooks.length,
+          itemBuilder: (context, index) {
+            final book = _filteredBooks[index];
+            return _buildBookCard(book, isMobile, index: index, canReorder: false);
+          },
+        );
       }
-    } else {
-      // Desktop/Tablet: Grid layout
-      return GridView.builder(
-        padding: EdgeInsets.all(16.w),
-        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-          childAspectRatio: 1.2,
-          crossAxisSpacing: 16.w,
-          mainAxisSpacing: 16.h,
-        ),
-        itemCount: _filteredBooks.length,
-        itemBuilder: (context, index) {
-          final book = _filteredBooks[index];
-          return _buildBookCard(book, isMobile, index: index, canReorder: false);
-        },
-      );
     }
   }
 

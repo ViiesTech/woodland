@@ -143,21 +143,24 @@ class BookService {
     }
   }
 
-  // Update positions of multiple books in a batch
-  static Future<void> updateBookPositions(List<String> bookIds) async {
+  // Update positions of multiple books/folders in a batch
+  // Each item goes to the correct collection based on isFolder flag
+  static Future<void> updateBookPositions(List<BookModel> items) async {
     try {
       final batch = _firestore.batch();
-      for (int i = 0; i < bookIds.length; i++) {
-        final docRef = _firestore.collection('books').doc(bookIds[i]);
+      for (int i = 0; i < items.length; i++) {
+        final item = items[i];
+        final collection = item.isFolder ? 'folders' : 'books';
+        final docRef = _firestore.collection(collection).doc(item.id);
         batch.update(docRef, {
           'position': i,
           'updatedAt': FieldValue.serverTimestamp(),
         });
       }
       await batch.commit();
-      print('✅ Batch updated ${bookIds.length} book positions successfully.');
+      print('✅ Batch updated ${items.length} item positions successfully.');
     } catch (e) {
-      print('❌ Error batch updating book positions: $e');
+      print('❌ Error batch updating positions: $e');
       rethrow;
     }
   }

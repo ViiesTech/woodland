@@ -32,6 +32,8 @@ class _EbookPageState extends State<EbookPage>
   List<BookModel> _recentSearchBooks = [];
   bool _isLoadingRecentSearches = false;
   Map<String, bool> _ownedBooks = {}; // Map of bookId -> isOwned
+  bool _isReorderMode = false;
+  List<BookModel> _localBooks = [];
 
   @override
   void initState() {
@@ -207,6 +209,14 @@ class _EbookPageState extends State<EbookPage>
 
                   final books = snapshot.data ?? [];
 
+                  if (_isReorderMode) {
+                    if (_localBooks.isEmpty || _localBooks.length != books.length) {
+                      _localBooks = List.from(books);
+                    }
+                  } else {
+                    _localBooks = [];
+                  }
+
                   if (books.isEmpty) {
                     return Center(
                       child: Text(
@@ -217,6 +227,71 @@ class _EbookPageState extends State<EbookPage>
                           color: Colors.white.withOpacity(0.6),
                           fontSize: 14.sp,
                         ),
+                      ),
+                    );
+                  }
+
+                  if (_isReorderMode) {
+                    return SingleChildScrollView(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 16.h),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  'Rearrange E-books',
+                                  style: AppTextStyles.lufgaLarge.copyWith(
+                                    color: Colors.white,
+                                    fontSize: 20.sp,
+                                  ),
+                                ),
+                                IconButton(
+                                  icon: Icon(
+                                    Icons.done,
+                                    color: Colors.green,
+                                    size: 24.sp,
+                                  ),
+                                  onPressed: () {
+                                    setState(() {
+                                      _isReorderMode = false;
+                                    });
+                                  },
+                                  tooltip: 'Done Reordering',
+                                ),
+                              ],
+                            ),
+                          ),
+                          ReorderableListView.builder(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            buildDefaultDragHandles: false,
+                            onReorder: (oldIndex, newIndex) async {
+                              setState(() {
+                                if (oldIndex < newIndex) {
+                                  newIndex -= 1;
+                                }
+                                final item = _localBooks.removeAt(oldIndex);
+                                _localBooks.insert(newIndex, item);
+                              });
+                              try {
+                                await BookService.updateBookPositions(_localBooks);
+                              } catch (e) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('Failed to save order: $e')),
+                                );
+                              }
+                            },
+                            itemCount: _localBooks.length,
+                            itemBuilder: (context, index) {
+                              final book = _localBooks[index];
+                              return _buildReorderableBookRow(book, index);
+                            },
+                          ),
+                          26.verticalSpace,
+                        ],
                       ),
                     );
                   }
@@ -296,12 +371,33 @@ class _EbookPageState extends State<EbookPage>
                           // New Release Section
                           Padding(
                             padding: EdgeInsets.symmetric(horizontal: 16.w),
-                            child: Text(
-                              'New Release',
-                              style: AppTextStyles.lufgaLarge.copyWith(
-                                color: Colors.white,
-                                fontSize: 20.sp,
-                              ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  'New Release',
+                                  style: AppTextStyles.lufgaLarge.copyWith(
+                                    color: Colors.white,
+                                    fontSize: 20.sp,
+                                  ),
+                                ),
+                                if (isAdmin) ...[
+                                  IconButton(
+                                    icon: Icon(
+                                      Icons.swap_vert,
+                                      color: AppColors.primaryColor,
+                                      size: 24.sp,
+                                    ),
+                                    onPressed: () {
+                                      setState(() {
+                                        _isReorderMode = true;
+                                        _localBooks = List.from(books);
+                                      });
+                                    },
+                                    tooltip: 'Rearrange Books & Folders',
+                                  ),
+                                ],
+                              ],
                             ),
                           ),
                           16.verticalSpace,
@@ -622,6 +718,102 @@ class _EbookPageState extends State<EbookPage>
             child: BookmarkIconButton(userId: _currentUserId!, book: book),
           ),
       ],
+    );
+  }
+
+  Widget _buildReorderableBookRow(BookModel book, int index) {
+    return Container(
+      key: ValueKey(book.id),
+      margin: EdgeInsets.symmetric(horizontal: 16.w, vertical: 6.h),
+      padding: EdgeInsets.all(12.w),
+      decoration: BoxDecoration(
+        color: AppColors.boxClr,
+        borderRadius: BorderRadius.circular(12.r),
+        border: Border.all(
+          color: Colors.white.withOpacity(0.05),
+        ),
+      ),
+      child: Row(
+        children: [
+          // Drag Handle
+          ReorderableDragStartListener(
+            index: index,
+            child: Padding(
+              padding: EdgeInsets.only(right: 12.w),
+              child: Icon(
+                Icons.drag_indicator,
+                color: Colors.white.withOpacity(0.5),
+                size: 24.sp,
+              ),
+            ),
+          ),
+          
+          // Book cover
+          Container(
+            width: 45.w,
+            height: 60.h,
+            decoration: BoxDecoration(
+              color: book.isFolder ? Colors.deepPurple.withOpacity(0.2) : AppColors.primaryColor.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(6.r),
+            ),
+            child: Icon(
+              book.isFolder ? Icons.folder : Icons.book,
+              color: book.isFolder ? Colors.deepPurpleAccent : AppColors.primaryColor,
+              size: 20.sp,
+            ),
+          ),
+          12.horizontalSpace,
+          
+          // Details
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  book.title,
+                  style: AppTextStyles.lufgaMedium.copyWith(
+                    color: Colors.white,
+                    fontSize: 14.sp,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                4.verticalSpace,
+                Text(
+                  book.isFolder ? 'Collection' : book.author,
+                  style: AppTextStyles.regular.copyWith(
+                    color: Colors.white.withOpacity(0.5),
+                    fontSize: 11.sp,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          
+          // Status Badge
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+            decoration: BoxDecoration(
+              color: book.isPublished ? Colors.green.withOpacity(0.1) : Colors.orange.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8.r),
+              border: Border.all(
+                color: book.isPublished ? Colors.green.withOpacity(0.3) : Colors.orange.withOpacity(0.3),
+              ),
+            ),
+            child: Text(
+              book.isPublished ? 'Published' : 'Draft',
+              style: AppTextStyles.small.copyWith(
+                color: book.isPublished ? Colors.green : Colors.orange,
+                fontSize: 10.sp,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
