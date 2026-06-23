@@ -1,12 +1,32 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:flutter_inappwebview/flutter_inappwebview.dart';
-import 'package:url_launcher/url_launcher.dart';
-import 'dart:io' show Platform;
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:the_woodlands_series/components/resource/app_colors.dart';
 import 'package:the_woodlands_series/components/resource/app_textstyle.dart';
-import 'package:the_woodlands_series/components/utils/three_dot_loader.dart';
+import 'package:the_woodlands_series/components/button/primary_button.dart';
+import 'package:the_woodlands_series/bloc/auth/auth_bloc.dart';
+import 'package:the_woodlands_series/bloc/auth/auth_state.dart';
+import 'package:the_woodlands_series/services/leaderboard_service.dart';
+
+enum GameDifficulty { easy, medium, hard }
+
+class MemoryCard {
+  final int id;
+  final IconData icon;
+  final Color color;
+  bool isFaceUp;
+  bool isMatched;
+
+  MemoryCard({
+    required this.id,
+    required this.icon,
+    required this.color,
+    this.isFaceUp = false,
+    this.isMatched = false,
+  });
+}
 
 class PlayGameScreen extends StatefulWidget {
   final String gameUrl;
@@ -23,1123 +43,764 @@ class PlayGameScreen extends StatefulWidget {
 }
 
 class _PlayGameScreenState extends State<PlayGameScreen> {
-  InAppWebViewController? _webViewController;
-  bool _isLoading = true;
-  bool _hasError = false;
-  bool _hasContent = false;
-  bool _showExternalBrowserOption = false;
-  double _progress = 0;
-  static const Duration _contentCheckDelay = Duration(seconds: 15);
-  static const Duration _maxLoadingDuration = Duration(seconds: 30);
+  GameDifficulty _difficulty = GameDifficulty.easy;
+  List<MemoryCard> _cards = [];
+  List<int> _selectedCardIndices = [];
+  bool _isChecking = false;
+  bool _isVictory = false;
+  bool _isGameOver = false;
+  int _moves = 0;
+  int _score = 0;
+  int _highScore = 0;
+  int _consecutiveMatches = 0;
+  int _cols = 3;
+
+  Timer? _timer;
+  int _timeLeft = 0;
+  int _totalTimeLimit = 0;
 
   @override
   void initState() {
     super.initState();
-    final isIOS = !kIsWeb && Platform.isIOS;
-    
-    // On iOS, automatically open in external browser due to WebKit networking issues
-    if (isIOS) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _openInExternalBrowser();
-        // Close this screen after opening external browser
-        Future.delayed(Duration(milliseconds: 500), () {
-          if (mounted) {
-            Navigator.of(context).pop();
-          }
-        });
-      });
-      return;
-    }
-    
-    // For Android and other platforms, use in-app WebView
-    // Start timeout fallback and content detection
-    _startContentDetection();
-    _startLoadingTimeout();
-    // Load game after first frame
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadGame();
+    _loadHighScore().then((_) {
+      _setupGame();
     });
   }
 
-  void _startContentDetection() {
-    // Check if content actually loaded after delay
-    Future.delayed(_contentCheckDelay, () {
-      if (mounted && !_hasContent && !_hasError) {
-        _checkForContent();
-      }
-    });
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
   }
 
-  void _startLoadingTimeout() {
-    // Fallback: hide loading after max duration and offer external browser
-    Future.delayed(_maxLoadingDuration, () {
-      if (mounted && _isLoading) {
-        print('Loading timeout reached after ${_maxLoadingDuration.inSeconds}s');
-        _checkForContent();
-        setState(() {
-          _isLoading = false;
-          if (!_hasContent && !_hasError) {
-            _showExternalBrowserOption = true;
-          }
-        });
-      }
-    });
-  }
-
-  Future<void> _checkForContent() async {
-    if (_webViewController == null || !mounted) return;
-
+  Future<void> _loadHighScore() async {
     try {
-      // Check if page has actual content (not just white screen)
-      final hasContent = await _webViewController!.evaluateJavascript(source: '''
-        (function() {
-          const body = document.body;
-          if (!body) return false;
-          
-          // Check if iframe exists and has loaded
-          const iframe = document.getElementById('game-iframe');
-          if (iframe) {
-            // Check if iframe has src and try to detect content
-            const iframeSrc = iframe.src;
-            if (iframeSrc && iframeSrc !== 'about:blank') {
-              // Try to detect if iframe loaded (may fail due to CORS)
-              try {
-                const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
-                if (iframeDoc && iframeDoc.body) {
-                  const hasCanvas = iframeDoc.querySelector('canvas') !== null;
-                  const hasUnity = typeof iframe.contentWindow.Unity !== 'undefined';
-                  if (hasCanvas || hasUnity || iframeDoc.body.children.length > 0) {
-                    return true;
-                  }
-                }
-              } catch (e) {
-                // CORS - can't access, but iframe src is set so assume loading
-                return true;
-              }
-            }
-          }
-          
-          // Check body content
-          const bodyText = body.innerText || body.textContent || '';
-          const bodyChildren = body.children.length;
-          
-          // If body has children or text, assume content exists
-          return bodyChildren > 1 || bodyText.trim().length > 10;
-        })();
-      ''');
-
-      print('Content check result: $hasContent');
-      
-      if (mounted) {
-        setState(() {
-          _hasContent = hasContent == true;
-          if (!_hasContent && !_isLoading && !_hasError) {
-            _showExternalBrowserOption = true;
-          }
-        });
-      }
+      final prefs = await SharedPreferences.getInstance();
+      setState(() {
+        _highScore = prefs.getInt('memory_game_high_score_${_difficulty.name}') ?? 0;
+      });
     } catch (e) {
-      print('Error checking content: $e');
-      if (mounted && !_isLoading && !_hasError) {
+      debugPrint('Error loading high score: $e');
+    }
+  }
+
+  Future<void> _saveHighScore() async {
+    if (_score > _highScore) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setInt('memory_game_high_score_${_difficulty.name}', _score);
         setState(() {
-          _showExternalBrowserOption = true;
+          _highScore = _score;
         });
+      } catch (e) {
+        debugPrint('Error saving high score: $e');
       }
     }
   }
 
-  void _loadGame() {
-    if (_webViewController != null) {
-      final isIOS = !kIsWeb && Platform.isIOS;
+  void _submitScoreToLeaderboard() {
+    final authState = context.read<AuthBloc>().state;
+    if (authState is Authenticated) {
+      final user = authState.user;
+      LeaderboardService.addScore(
+        user.id,
+        user.name,
+        user.profileImageUrl,
+        _score,
+      ).catchError((e) {
+        debugPrint('Error updating leaderboard: $e');
+      });
+    }
+  }
+
+  void _setupGame() {
+    int pairsCount;
+    int gridCols;
+    int timeLimit;
+    switch (_difficulty) {
+      case GameDifficulty.easy:
+        pairsCount = 6;
+        gridCols = 3;
+        timeLimit = 90; // generous time (1:30)
+        break;
+      case GameDifficulty.medium:
+        pairsCount = 8;
+        gridCols = 4;
+        timeLimit = 60; // normal time (1:00)
+        break;
+      case GameDifficulty.hard:
+        pairsCount = 10;
+        gridCols = 4;
+        timeLimit = 40; // challenging time (0:40)
+        break;
+    }
+
+    // Curated premium icons matching a Woodland theme
+    final availableIcons = [
+      Icons.pets,            // Animals
+      Icons.park,            // Trees
+      Icons.flutter_dash,    // Birds
+      Icons.eco,             // Leaves
+      Icons.star,            // Night Sky
+      Icons.bug_report,      // Forest Bugs
+      Icons.wb_sunny,        // Sunrise
+      Icons.water_drop,      // Morning Dew
+      Icons.terrain,         // Hills/Mountains
+      Icons.local_florist,   // Flowers
+    ];
+
+    final availableColors = [
+      Colors.orangeAccent,
+      Colors.greenAccent,
+      Colors.lightBlueAccent,
+      Colors.pinkAccent,
+      Colors.amberAccent,
+      Colors.redAccent,
+      Colors.purpleAccent,
+      Colors.tealAccent,
+      Colors.cyanAccent,
+      Colors.indigoAccent,
+    ];
+
+    List<MemoryCard> newCards = [];
+    for (int i = 0; i < pairsCount; i++) {
+      final icon = availableIcons[i];
+      final color = availableColors[i];
       
-      if (isIOS) {
-        // On iOS, load URL directly (like external browser) to avoid WebKit networking issues
-        print('iOS detected: Loading URL directly instead of iframe');
-        _webViewController!.loadUrl(
-          urlRequest: URLRequest(
-            url: WebUri(widget.gameUrl),
-          ),
-        );
-      } else {
-        // On Android, use iframe wrapper for better Unity WASM/GPU control
-        _webViewController!.loadData(
-          data: _buildIframeHtml(),
-          baseUrl: WebUri(widget.gameUrl),
-          mimeType: 'text/html',
-          encoding: 'utf-8',
-        );
-      }
+      newCards.add(MemoryCard(id: i * 2, icon: icon, color: color));
+      newCards.add(MemoryCard(id: i * 2 + 1, icon: icon, color: color));
     }
-  }
 
-  InAppWebViewSettings _buildWebViewSettings() {
-    final isIOS = !kIsWeb && Platform.isIOS;
-    final isAndroid = !kIsWeb && Platform.isAndroid;
-    
-    return InAppWebViewSettings(
-      javaScriptEnabled: true,
-      domStorageEnabled: true,
-      cacheEnabled: true,
-      cacheMode: CacheMode.LOAD_DEFAULT,
-      clearCache: false,
-      mediaPlaybackRequiresUserGesture: false,
-      // Platform-specific settings - useHybridComposition is Android-only
-      useHybridComposition: isAndroid,
-      useShouldOverrideUrlLoading: true,
-      allowsInlineMediaPlayback: true,
-      supportZoom: false,
-      transparentBackground: false,
-      // iOS-specific user agent for better compatibility
-      userAgent: isIOS
-          ? 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1'
-          : 'Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
-      // Unity WebGL specific settings
-      allowsLinkPreview: false,
-      disableHorizontalScroll: false,
-      disableVerticalScroll: false,
-      // Better WASM support
-      useOnDownloadStart: false,
-      useOnLoadResource: false,
-    );
-  }
+    newCards.shuffle();
 
-  String _buildIframeHtml() {
-    return '''
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Unity Game</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        html, body {
-            width: 100%;
-            height: 100vh;
-            overflow: hidden;
-            background-color: #000;
-            position: fixed;
-            top: 0;
-            left: 0;
-        }
-        #game-container {
-            width: 100%;
-            height: 100vh;
-            position: relative;
-            overflow: hidden;
-            background-color: #000;
-        }
-        #game-iframe {
-            width: 100%;
-            height: 100%;
-            border: none;
-            display: block;
-            position: absolute;
-            top: 0;
-            left: 0;
-        }
-        .loading {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            color: white;
-            font-family: Arial, sans-serif;
-            z-index: 1;
-        }
-    </style>
-</head>
-<body>
-    <div id="game-container">
-        <div class="loading" id="loading">Loading game...</div>
-        <iframe 
-            id="game-iframe"
-            src="${widget.gameUrl}"
-            allow="autoplay; fullscreen; gamepad; microphone; camera; xr-spatial-tracking"
-            allowfullscreen
-            webkitallowfullscreen
-            mozallowfullscreen
-            msallowfullscreen
-            style="width:100%; height:100%; border:none;"
-        ></iframe>
-    </div>
-    <script>
-        (function() {
-            const iframe = document.getElementById('game-iframe');
-            const loading = document.getElementById('loading');
-            let hasNotifiedFlutter = false;
-            
-            function notifyFlutterLoaded(success, hasUnity) {
-                if (hasNotifiedFlutter) return;
-                hasNotifiedFlutter = true;
-                
-                // Notify Flutter that iframe loaded
-                try {
-                    if (window.flutter_inappwebview && window.flutter_inappwebview.callHandler) {
-                        window.flutter_inappwebview.callHandler('iframeLoaded', {
-                            success: success,
-                            hasUnity: hasUnity || false
-                        });
-                        console.log('Notified Flutter: iframe loaded');
-                    }
-                } catch (e) {
-                    console.log('Cannot call Flutter handler:', e);
-                }
-            }
-            
-            function hideLoading() {
-                if (loading) {
-                    loading.style.display = 'none';
-                }
-            }
-            
-            // Hide loading after iframe loads
-            if (iframe) {
-                iframe.addEventListener('load', function() {
-                    console.log('Unity game iframe loaded event fired');
-                    
-                    // Wait for Unity to initialize inside the iframe
-                    setTimeout(function() {
-                        let hasUnity = false;
-                        try {
-                            // Try to access iframe content (might fail due to CORS)
-                            const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
-                            const hasCanvas = iframeDoc.querySelector('canvas') !== null;
-                            hasUnity = typeof iframe.contentWindow.Unity !== 'undefined' || 
-                                       typeof iframe.contentWindow.unityInstance !== 'undefined';
-                            
-                            console.log('Unity check inside iframe - hasCanvas:', hasCanvas, 'hasUnity:', hasUnity);
-                            
-                            if (hasCanvas || hasUnity) {
-                                console.log('Unity game detected inside iframe');
-                                hideLoading();
-                            } else {
-                                // Even if Unity not detected, hide loading after a delay
-                                console.log('Unity not detected but hiding loading anyway');
-                                setTimeout(hideLoading, 3000);
-                            }
-                        } catch (e) {
-                            // CORS might block access to iframe content
-                            console.log('Cannot access iframe content (CORS):', e);
-                            // Hide loading anyway after delay
-                            setTimeout(hideLoading, 5000);
-                        }
-                        
-                        // Notify Flutter
-                        notifyFlutterLoaded(true, hasUnity);
-                    }, 2000); // Wait 2 seconds for Unity to start loading
-                });
-                
-                // Handle errors
-                iframe.addEventListener('error', function(e) {
-                    console.error('Iframe load error:', e);
-                    if (loading) {
-                        loading.textContent = 'Failed to load game. Please try again.';
-                    }
-                    notifyFlutterLoaded(false, false);
-                });
-            }
-            
-            // Fallback: If iframe doesn't fire load event within 8 seconds, assume it loaded
-            setTimeout(function() {
-                if (!hasNotifiedFlutter && iframe) {
-                    console.log('Iframe load timeout - assuming loaded (fallback)');
-                    hideLoading();
-                    notifyFlutterLoaded(true, false);
-                }
-            }, 8000);
-            
-            // Listen for messages from Unity
-            window.addEventListener('message', function(event) {
-                console.log('Received message from Unity:', event.data);
-                
-                // If we receive a message, the game is likely loaded
-                if (!hasNotifiedFlutter) {
-                    notifyFlutterLoaded(true, true);
-                }
-                
-                // Forward messages if needed
-                if (window.parent !== window) {
-                    try {
-                        window.parent.postMessage(event.data, '*');
-                    } catch (e) {
-                        console.log('Cannot forward message:', e);
-                    }
-                }
-            });
-            
-            console.log('Unity game iframe container initialized');
-        })();
-    </script>
-</body>
-</html>
-    ''';
-  }
-
-  Future<void> _onLoadStart(
-    InAppWebViewController controller,
-    WebUri? url,
-  ) async {
-    final urlString = url?.toString() ?? '';
-    print('Load started: $urlString');
-    
-    // Ignore about:blank loads (iOS initialization)
-    if (urlString == 'about:blank') {
-      print('Ignoring about:blank load (iOS WebView initialization)');
-      return;
-    }
-    
     setState(() {
-      _isLoading = true;
-      _hasError = false;
-      _progress = 0;
+      _cards = newCards;
+      _cols = gridCols;
+      _moves = 0;
+      _score = 0;
+      _consecutiveMatches = 0;
+      _selectedCardIndices.clear();
+      _isChecking = false;
+      _isVictory = false;
+      _isGameOver = false;
+      _timeLeft = timeLimit;
+      _totalTimeLimit = timeLimit;
     });
+
+    _startTimer();
   }
 
-  void _setupJavaScriptHandlers(InAppWebViewController controller) {
-    // Listen for iframe loaded event from JavaScript (Android only)
-    controller.addJavaScriptHandler(
-      handlerName: 'iframeLoaded',
-      callback: (args) {
-        print('Iframe loaded callback received: $args');
-        if (mounted) {
-          final success = args.isNotEmpty && args[0] is Map 
-              ? (args[0] as Map)['success'] == true 
-              : false;
-          setState(() {
-            _isLoading = false;
-            _hasContent = success;
-            if (!success) {
-              _showExternalBrowserOption = true;
-            }
-          });
-          
-          // Verify content after a delay
-          if (success) {
-            Future.delayed(Duration(seconds: 2), () {
-              _checkForContent();
-            });
-          }
-        }
-      },
-    );
-    
-    // Listen for Unity game loaded messages
-    controller.addJavaScriptHandler(
-      handlerName: 'unityGameLoaded',
-      callback: (args) {
-        print('Unity game loaded via iframe');
-        if (mounted) {
-          setState(() {
-            _isLoading = false;
-            _hasContent = true;
-          });
-        }
-      },
-    );
-  }
-
-  Future<void> _onLoadStopDirect(
-    InAppWebViewController controller,
-    WebUri? url,
-  ) async {
-    final urlString = url?.toString() ?? '';
-    print('Page loaded (direct): $urlString');
-    
-    // Ignore about:blank (iOS initialization)
-    if (urlString == 'about:blank') {
-      print('Ignoring about:blank load stop (iOS WebView initialization)');
-      return;
-    }
-    
-    if (!mounted) return;
-
-    // For direct URL loading (iOS), check if content loaded
-    await Future.delayed(Duration(milliseconds: 1000));
-
-    try {
-      // Check if Unity game elements exist
-      final hasUnityContent = await controller.evaluateJavascript(source: '''
-        (function() {
-          // Check for Unity WebGL canvas
-          const canvas = document.querySelector('canvas');
-          const hasCanvas = canvas !== null;
-          
-          // Check for Unity instance
-          const hasUnity = typeof window.Unity !== 'undefined' || 
-                          typeof window.unityInstance !== 'undefined' ||
-                          typeof window.Module !== 'undefined';
-          
-          // Check for Unity loader script
-          const hasUnityScript = document.querySelector('script[src*="unity"], script[src*="loader"], script[src*=".wasm"]') !== null;
-          
-          return hasCanvas || hasUnity || hasUnityScript || document.body.children.length > 0;
-        })();
-      ''');
-
-      print('Unity content check: $hasUnityContent');
-
+  void _startTimer() {
+    _timer?.cancel();
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (mounted) {
+        if (_isVictory || _isGameOver) {
+          _timer?.cancel();
+          return;
+        }
+
         setState(() {
-          _isLoading = false;
-          _hasContent = hasUnityContent == true;
-          if (!_hasContent) {
-            // Check again after delay
-            Future.delayed(Duration(seconds: 3), () {
-              _checkForContent();
-            });
+          if (_timeLeft > 0) {
+            _timeLeft--;
+          } else {
+            _isGameOver = true;
+            _timer?.cancel();
           }
         });
       }
-    } catch (e) {
-      print('Error checking Unity content: $e');
-      // Hide loading anyway after delay
-      Future.delayed(Duration(seconds: 3), () {
-        if (mounted && _isLoading) {
-          setState(() {
-            _isLoading = false;
-          });
-          _checkForContent();
-        }
-      });
-    }
+    });
   }
 
-  Future<void> _onLoadStop(
-    InAppWebViewController controller,
-    WebUri? url,
-  ) async {
-    print('Page loaded: ${url?.toString()}');
-    
-    if (!mounted) return;
+  void _onCardTap(int index) {
+    if (_isChecking || _isGameOver || _cards[index].isFaceUp || _cards[index].isMatched) return;
 
-    // Wait a bit for the HTML to parse and iframe to start loading
-    await Future.delayed(Duration(milliseconds: 500));
+    setState(() {
+      _cards[index].isFaceUp = true;
+      _selectedCardIndices.add(index);
+    });
 
-    // Verify the page loaded correctly
-    try {
-      final bodyExists = await controller.evaluateJavascript(
-        source: 'document.body !== null;',
-      );
-      print('Body exists: $bodyExists');
+    if (_selectedCardIndices.length == 2) {
+      _isChecking = true;
+      _moves++;
 
-      if (bodyExists == true) {
-        // Check if iframe element exists
-        final iframeExists = await controller.evaluateJavascript(
-          source: 'document.getElementById("game-iframe") !== null;',
-        );
-        print('Iframe element exists: $iframeExists');
+      final card1 = _cards[_selectedCardIndices[0]];
+      final card2 = _cards[_selectedCardIndices[1]];
 
-        // Inject JavaScript to notify when iframe loads
-        await controller.evaluateJavascript(source: '''
-          (function() {
-            const iframe = document.getElementById('game-iframe');
-            if (iframe) {
-              iframe.addEventListener('load', function() {
-                console.log('Iframe loaded successfully');
-                window.flutter_inappwebview.callHandler('iframeLoaded', {
-                  success: true
-                });
-              });
-              
-              iframe.addEventListener('error', function() {
-                console.log('Iframe load error');
-                window.flutter_inappwebview.callHandler('iframeLoaded', {
-                  success: false,
-                  error: 'Iframe failed to load'
-                });
-              });
-              
-              // Fallback: if iframe doesn't fire load event after 5 seconds, consider it loaded
-              setTimeout(function() {
-                console.log('Iframe load timeout - assuming loaded');
-                window.flutter_inappwebview.callHandler('iframeLoaded', {
-                  success: true,
-                  timeout: true
-                });
-              }, 5000);
-            }
-          })();
-        ''');
-
-        // Hide loading after a shorter delay for iOS
-        final isIOS = !kIsWeb && Platform.isIOS;
-        final delay = isIOS ? Duration(seconds: 3) : Duration(seconds: 5);
+      if (card1.icon == card2.icon) {
+        // Match found!
+        _consecutiveMatches++;
+        final pointsGained = 100 * _consecutiveMatches;
         
-        Future.delayed(delay, () {
-          if (mounted && _isLoading) {
-            print('Auto-hiding loader after delay');
+        // Bonus for fast matching (more than 50% time remaining)
+        final speedBonus = (_timeLeft > _totalTimeLimit / 2) ? 50 : 0;
+        
+        setState(() {
+          _score += (pointsGained + speedBonus);
+        });
+
+        Future.delayed(const Duration(milliseconds: 500), () {
+          if (mounted) {
             setState(() {
-              _isLoading = false;
+              card1.isMatched = true;
+              card2.isMatched = true;
+              _selectedCardIndices.clear();
+              _isChecking = false;
+
+              if (_cards.every((card) => card.isMatched)) {
+                _isVictory = true;
+                _timer?.cancel();
+                _saveHighScore();
+                _submitScoreToLeaderboard();
+              }
             });
-            // Check for content after hiding loader
-            _checkForContent();
+          }
+        });
+      } else {
+        // No match
+        _consecutiveMatches = 0;
+        if (_score >= 10) {
+          setState(() {
+            _score -= 10;
+          });
+        }
+
+        Future.delayed(const Duration(milliseconds: 1000), () {
+          if (mounted) {
+            setState(() {
+              card1.isFaceUp = false;
+              card2.isFaceUp = false;
+              _selectedCardIndices.clear();
+              _isChecking = false;
+            });
           }
         });
       }
-    } catch (e) {
-      print('Error in onLoadStop: $e');
-      // Even if there's an error, hide loading after delay
-      Future.delayed(Duration(seconds: 3), () {
-        if (mounted && _isLoading) {
-          setState(() {
-            _isLoading = false;
-          });
-        }
-      });
     }
   }
 
-  void _onProgressChanged(InAppWebViewController controller, int progress) {
-    if (!mounted) return;
-    
-    setState(() {
-      _progress = progress / 100;
-    });
-    
-    // On iOS, when loading HTML data, progress might reach 100% quickly
-    // but we still need to wait for the iframe inside to load
-    if (progress == 100) {
-      // Don't hide immediately - wait for iframe to load
-      // The onLoadStop or JavaScript handler will handle hiding
-      print('Progress reached 100%, but waiting for iframe to load...');
-    }
-  }
-
-  bool _onConsoleMessage(
-    InAppWebViewController controller,
-    ConsoleMessage consoleMessage,
-  ) {
-    print('Console: ${consoleMessage.message}');
-    return true;
-  }
-
-  void _onReceivedError(
-    InAppWebViewController controller,
-    WebResourceRequest request,
-    WebResourceError error,
-  ) {
-    // Don't show error for cache failures or minor resource failures
-    // Unity games often have warnings that shouldn't be treated as fatal errors
-    final url = request.url.toString();
-    final isWasm = url.endsWith('.wasm') || url.contains('.wasm');
-    final isCacheError =
-        error.description.contains('ERR_CACHE_WRITE_FAILURE') ||
-        error.description.contains('ERR_CACHE_MISS') ||
-        error.description.contains('cache');
-
-    if (error.type == WebResourceErrorType.HOST_LOOKUP ||
-        error.type == WebResourceErrorType.UNKNOWN ||
-        isCacheError ||
-        isWasm) {
-      print('WebView resource error (non-critical): ${error.description}');
-      // Don't set error state for these - let the game try to load anyway
-      return;
-    }
-
-    // Only show error for critical failures that are not WASM or cache related
-    setState(() {
-      _isLoading = false;
-      _hasError = true;
-    });
-    print('WebView error: ${error.description}');
-  }
-
-  // Intercept requests to fix WASM MIME types
-  Future<WebResourceResponse?> _shouldInterceptRequest(
-    InAppWebViewController controller,
-    WebResourceRequest request,
-  ) async {
-    final url = request.url.toString();
-
-    // Log WASM file requests for debugging
-    if (url.endsWith('.wasm')) {
-      print('Intercepting WASM file request: $url');
-      // The actual WASM handling is done via JavaScript injection in onLoadStop
-      // Return null to let the normal request proceed, but with better JS handling
-      return null;
-    }
-
-    return null; // Let other requests proceed normally
-  }
-
-  Future<void> _openInExternalBrowser() async {
-    try {
-      final uri = Uri.parse(widget.gameUrl);
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(
-          uri,
-          mode: LaunchMode.externalApplication,
-        );
-        // Optionally close this screen after opening in browser
-        // Navigator.of(context).pop();
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Cannot open this URL in browser'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      print('Error opening in external browser: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error opening browser: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
-
-  void _showExitDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (BuildContext dialogContext) {
-        return AlertDialog(
-          backgroundColor: AppColors.boxClr,
-          title: Text(
-            'Exit Game?',
-            style: AppTextStyles.lufgaMedium.copyWith(
-              color: Colors.white,
-              fontSize: 18.sp,
-            ),
-          ),
-          content: Text(
-            'Are you sure you want to close the game?',
-            style: AppTextStyles.regular.copyWith(
-              color: Colors.white.withOpacity(0.7),
-              fontSize: 14.sp,
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(dialogContext).pop(); // Close dialog
-              },
-              child: Text(
-                'No',
-                style: AppTextStyles.medium.copyWith(
-                  color: Colors.white.withOpacity(0.7),
-                  fontSize: 14.sp,
-                ),
-              ),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.of(dialogContext).pop(); // Close dialog
-                Navigator.of(context).pop(); // Exit game screen
-              },
-              child: Text(
-                'Yes',
-                style: AppTextStyles.medium.copyWith(
-                  color: AppColors.primaryColor,
-                  fontSize: 14.sp,
-                ),
-              ),
-            ),
-          ],
-        );
-      },
-    );
+  String _formatTime(int seconds) {
+    final minutes = seconds ~/ 60;
+    final remainingSeconds = seconds % 60;
+    return '${minutes.toString().padLeft(2, '0')}:${remainingSeconds.toString().padLeft(2, '0')}';
   }
 
   @override
   Widget build(BuildContext context) {
-    final isIOS = !kIsWeb && Platform.isIOS;
-    
-    // On iOS, show loading screen while opening external browser
-    if (isIOS) {
-      return Scaffold(
-        backgroundColor: AppColors.bgClr,
-        appBar: AppBar(
-          backgroundColor: AppColors.boxClr,
-          leading: IconButton(
-            icon: Icon(Icons.arrow_back, color: Colors.white),
-            onPressed: () => Navigator.of(context).pop(),
-          ),
-          title: Text(
-            widget.gameTitle,
-            style: AppTextStyles.lufgaMedium.copyWith(
-              color: Colors.white,
-              fontSize: 18.sp,
-            ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+    return Scaffold(
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Color(0xFF0F1E15),
+              Color(0xFF070B08),
+            ],
           ),
         ),
-        body: Center(
+        child: SafeArea(
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              ThreeDotLoader(
-                color: AppColors.primaryColor,
-                size: 12.w,
-                spacing: 8.w,
-              ),
+              // Header & Back button
+              _buildHeader(context),
+              
+              // Difficulty tabs selector
+              _buildDifficultySelector(),
+
               16.verticalSpace,
-              Text(
-                'Opening game in browser...',
-                style: AppTextStyles.medium.copyWith(
-                  color: Colors.white.withOpacity(0.7),
-                  fontSize: 14.sp,
+
+              // Stats Display Bar
+              _buildStatsBar(),
+
+              20.verticalSpace,
+
+              // The Memory Grid
+              Expanded(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16.w),
+                  child: _buildGrid(),
+                ),
+              ),
+
+              20.verticalSpace,
+
+              // Reset / Restart Button
+              Padding(
+                padding: EdgeInsets.only(bottom: 24.h),
+                child: PrimaryButton(
+                  buttonWidth: 200.w,
+                  title: 'Reset Game',
+                  onTap: _setupGame,
                 ),
               ),
             ],
           ),
         ),
-      );
-    }
-    
-    // For Android and other platforms, show WebView
-    return PopScope(
-      canPop: false,
-      onPopInvoked: (didPop) {
-        if (didPop) return;
-        _showExitDialog(context);
-      },
-      child: Scaffold(
-        backgroundColor: AppColors.bgClr,
-        appBar: AppBar(
-          backgroundColor: AppColors.boxClr,
-          leading: IconButton(
-            icon: Icon(Icons.arrow_back, color: Colors.white),
-            onPressed: () => _showExitDialog(context),
+      ),
+    );
+  }
+
+  Widget _buildHeader(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+      child: Row(
+        children: [
+          IconButton(
+            icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
+            onPressed: () => Navigator.of(context).pop(),
           ),
-          title: Text(
-            widget.gameTitle,
-            style: AppTextStyles.lufgaMedium.copyWith(
-              color: Colors.white,
-              fontSize: 18.sp,
+          Expanded(
+            child: Text(
+              'Mind Game',
+              style: AppTextStyles.lufgaLarge.copyWith(
+                color: Colors.white,
+                fontSize: 22.sp,
+                fontWeight: FontWeight.bold,
+              ),
             ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
           ),
-          actions: [
-            // External browser button - always available
-            IconButton(
-              icon: Icon(Icons.open_in_browser, color: Colors.white),
-              onPressed: () => _openInExternalBrowser(),
-              tooltip: 'Open in Browser',
+          Text(
+            'High Score: $_highScore',
+            style: AppTextStyles.medium.copyWith(
+              color: AppColors.primaryColor,
+              fontSize: 14.sp,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDifficultySelector() {
+    return Container(
+      margin: EdgeInsets.symmetric(horizontal: 16.w),
+      padding: EdgeInsets.all(4.w),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(12.r),
+      ),
+      child: Row(
+        children: GameDifficulty.values.map((diff) {
+          final isSelected = _difficulty == diff;
+          return Expanded(
+            child: GestureDetector(
+              onTap: () {
+                if (_difficulty != diff) {
+                  setState(() {
+                    _difficulty = diff;
+                  });
+                  _loadHighScore().then((_) => _setupGame());
+                }
+              },
+              child: Container(
+                padding: EdgeInsets.symmetric(vertical: 10.h),
+                decoration: BoxDecoration(
+                  color: isSelected ? AppColors.primaryColor : Colors.transparent,
+                  borderRadius: BorderRadius.circular(10.r),
+                ),
+                child: Center(
+                  child: Text(
+                    diff.name.toUpperCase(),
+                    style: AppTextStyles.medium.copyWith(
+                      color: isSelected ? Colors.black : Colors.white.withOpacity(0.6),
+                      fontSize: 12.sp,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildStatsBar() {
+    return Container(
+      margin: EdgeInsets.symmetric(horizontal: 16.w),
+      padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 12.h),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(16.r),
+        border: Border.all(color: Colors.white.withOpacity(0.1)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          _buildStatItem(
+            Icons.timer_outlined, 
+            _formatTime(_timeLeft), 
+            'Time Left',
+            valueColor: _timeLeft <= 10 ? Colors.redAccent : Colors.white,
+          ),
+          _buildStatItem(Icons.touch_app_outlined, '$_moves', 'Moves'),
+          _buildStatItem(Icons.stars_outlined, '$_score', 'Score'),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatItem(IconData icon, String value, String label, {Color? valueColor}) {
+    return Column(
+      children: [
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: AppColors.primaryColor, size: 18.sp),
+            6.horizontalSpace,
+            Text(
+              value,
+              style: AppTextStyles.lufgaMedium.copyWith(
+                color: valueColor ?? Colors.white,
+                fontSize: 16.sp,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ],
         ),
-        body: Stack(
-          children: [
-            // InAppWebView - Platform-specific loading strategy
-            Builder(
-              builder: (context) {
-                final isIOS = !kIsWeb && Platform.isIOS;
-                
-                // On iOS, load URL after WebView is created to avoid WebKit networking initialization issues
-                if (isIOS) {
-                  return InAppWebView(
-                    // Load blank page first, then load game URL after WebView initializes
-                    initialUrlRequest: URLRequest(
-                      url: WebUri('about:blank'),
-                    ),
-                    initialSettings: _buildWebViewSettings(),
-                    onWebViewCreated: (controller) {
-                      _webViewController = controller;
-                      _setupJavaScriptHandlers(controller);
-                      
-                      // Load game URL after WebView is fully initialized (fixes WebKit networking error)
-                      Future.delayed(Duration(milliseconds: 500), () {
-                        if (mounted && _webViewController != null) {
-                          print('iOS: Loading game URL after WebView initialization');
-                          _webViewController!.loadUrl(
-                            urlRequest: URLRequest(
-                              url: WebUri(widget.gameUrl),
-                            ),
-                          );
-                        }
-                      });
-                    },
-                    onLoadStart: _onLoadStart,
-                    onLoadStop: _onLoadStopDirect,
-                    onConsoleMessage: _onConsoleMessage,
-                    onProgressChanged: _onProgressChanged,
-                    onReceivedError: _onReceivedError,
-                    shouldInterceptRequest: _shouldInterceptRequest,
-                    onReceivedHttpError: (controller, request, response) {
-                      final url = request.url.toString();
-                      
-                      // Ignore about:blank errors
-                      if (url == 'about:blank') return;
-                      
-                      final isWasm = url.endsWith('.wasm') || url.contains('.wasm');
-                      final statusCode = response.statusCode;
-                      
-                      if (statusCode != null && statusCode >= 400 && !isWasm) {
-                        final isForMainFrame = request.isForMainFrame ?? false;
-                        if (isForMainFrame) {
-                          setState(() {
-                            _isLoading = false;
-                            _hasError = true;
-                          });
-                          print('HTTP error (main frame): $statusCode');
-                        }
-                      }
-                    },
-                  );
-                }
-                
-                // On Android, use iframe wrapper for Unity WASM/GPU control
-                return InAppWebView(
-                  initialData: InAppWebViewInitialData(
-                    data: _buildIframeHtml(),
-                    baseUrl: WebUri(widget.gameUrl),
-                    mimeType: 'text/html',
-                    encoding: 'utf-8',
-                  ),
-                  initialSettings: _buildWebViewSettings(),
-                  onWebViewCreated: (controller) {
-                    _webViewController = controller;
-                    _setupJavaScriptHandlers(controller);
-                  },
-                  onLoadStart: _onLoadStart,
-                  onLoadStop: _onLoadStop,
-                  onConsoleMessage: _onConsoleMessage,
-                  onProgressChanged: _onProgressChanged,
-                  onReceivedError: _onReceivedError,
-                  shouldInterceptRequest: _shouldInterceptRequest,
-                  onReceivedHttpError: (controller, request, response) {
-                    final url = request.url.toString();
-                    final isWasm = url.endsWith('.wasm') || url.contains('.wasm');
-                    final statusCode = response.statusCode;
-                    
-                    if (statusCode != null && statusCode >= 400 && !isWasm) {
-                      final isForMainFrame = request.isForMainFrame ?? false;
-                      if (isForMainFrame) {
-                        setState(() {
-                          _isLoading = false;
-                          _hasError = true;
-                        });
-                        print('HTTP error (main frame): $statusCode');
-                      }
-                    }
-                  },
-                );
-              },
-            ),
+        4.verticalSpace,
+        Text(
+          label,
+          style: AppTextStyles.regular.copyWith(
+            color: Colors.white.withOpacity(0.5),
+            fontSize: 11.sp,
+          ),
+        ),
+      ],
+    );
+  }
 
-            // Loading Indicator
-            if (_isLoading && !_hasError)
-              Container(
-                color: AppColors.bgClr,
-                child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      ThreeDotLoader(
-                        color: AppColors.primaryColor,
-                        size: 12.w,
-                        spacing: 8.w,
-                      ),
-                      16.verticalSpace,
-                      Text(
-                        'Loading game...',
-                        style: AppTextStyles.medium.copyWith(
-                          color: Colors.white.withOpacity(0.7),
-                          fontSize: 14.sp,
+  Widget _buildGrid() {
+    if (_isVictory) {
+      return _buildVictoryScreen();
+    }
+    if (_isGameOver) {
+      return _buildDefeatScreen();
+    }
+
+    final rows = (_cards.length / _cols).ceil();
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final gridWidth = constraints.maxWidth;
+        final gridHeight = constraints.maxHeight;
+
+        final hSpacing = 12.w * (_cols - 1);
+        final vSpacing = 12.h * (rows - 1);
+
+        final cardWidth = (gridWidth - hSpacing) / _cols;
+        final cardHeight = (gridHeight - vSpacing) / rows;
+
+        // Calculate aspect ratio dynamically so that all rows fit exactly within height
+        double aspectRatio = cardWidth / cardHeight;
+
+        // Clamp values to keep cards looking like nice proportioned rectangles/squares
+        if (aspectRatio < 0.65) {
+          aspectRatio = 0.65;
+        } else if (aspectRatio > 1.25) {
+          aspectRatio = 1.25;
+        }
+
+        return GridView.builder(
+          physics: const BouncingScrollPhysics(),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: _cols,
+            crossAxisSpacing: 12.w,
+            mainAxisSpacing: 12.h,
+            childAspectRatio: aspectRatio,
+          ),
+          itemCount: _cards.length,
+          itemBuilder: (context, index) {
+            final card = _cards[index];
+            return GestureDetector(
+              onTap: () => _onCardTap(index),
+              child: FlipCard(
+                isFaceUp: card.isFaceUp || card.isMatched,
+                front: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(16.r),
+                    border: Border.all(
+                      color: card.isMatched 
+                          ? Colors.amber.withOpacity(0.6) 
+                          : Colors.white.withOpacity(0.2),
+                      width: card.isMatched ? 2 : 1,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: card.isMatched 
+                            ? Colors.amber.withOpacity(0.2) 
+                            : Colors.black.withOpacity(0.1),
+                        blurRadius: 10,
+                      )
+                    ],
+                  ),
+                  child: Center(
+                    child: Icon(
+                      card.icon,
+                      color: card.color,
+                      size: 36.sp,
+                    ),
+                  ),
+                ),
+                back: Container(
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        Color(0xFF1B3527),
+                        Color(0xFF0B1710),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(16.r),
+                    border: Border.all(color: Colors.white.withOpacity(0.1)),
+                  ),
+                  child: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.forest,
+                          color: AppColors.primaryColor.withOpacity(0.6),
+                          size: 28.sp,
                         ),
-                      ),
-                      if (_progress > 0 && _progress < 1) ...[
-                        16.verticalSpace,
-                        SizedBox(
-                          width: 200.w,
-                          child: LinearProgressIndicator(
-                            value: _progress,
-                            backgroundColor: Colors.white.withOpacity(0.2),
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                              AppColors.primaryColor,
-                            ),
+                        4.verticalSpace,
+                        Text(
+                          'WOODLAND',
+                          style: AppTextStyles.regular.copyWith(
+                            color: Colors.white.withOpacity(0.3),
+                            fontSize: 8.sp,
+                            letterSpacing: 2,
                           ),
                         ),
                       ],
-                    ],
+                    ),
                   ),
                 ),
               ),
+            );
+          },
+        );
+      },
+    );
+  }
 
-            // External Browser Banner (shown when content not detected)
-            if (_showExternalBrowserOption && !_isLoading && !_hasError)
-              SafeArea(
-                bottom: false,
-                child: Container(
-                  width: double.infinity,
-                  padding: EdgeInsets.all(16.w),
-                  decoration: BoxDecoration(
-                    color: AppColors.boxClr,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.3),
-                        blurRadius: 8,
-                        offset: Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(Icons.warning_amber_rounded,
-                              color: Colors.orange, size: 24.sp),
-                          12.horizontalSpace,
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Game may not be loading properly',
-                                  style: AppTextStyles.medium.copyWith(
-                                    color: Colors.white,
-                                    fontSize: 14.sp,
-                                  ),
-                                ),
-                                4.verticalSpace,
-                                Text(
-                                  'Try opening in external browser for better compatibility',
-                                  style: AppTextStyles.regular.copyWith(
-                                    color: Colors.white.withOpacity(0.7),
-                                    fontSize: 12.sp,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          IconButton(
-                            icon: Icon(Icons.close, color: Colors.white, size: 20.sp),
-                            onPressed: () {
-                              setState(() {
-                                _showExternalBrowserOption = false;
-                              });
-                            },
-                            padding: EdgeInsets.zero,
-                            constraints: BoxConstraints(),
-                          ),
-                        ],
-                      ),
-                      12.verticalSpace,
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton.icon(
-                          onPressed: _openInExternalBrowser,
-                          icon: Icon(Icons.open_in_browser, size: 18.sp),
-                          label: Text(
-                            'Open in Browser',
-                            style: AppTextStyles.medium.copyWith(
-                              color: Colors.black,
-                              fontSize: 14.sp,
-                            ),
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primaryColor,
-                            padding: EdgeInsets.symmetric(
-                              horizontal: 24.w,
-                              vertical: 12.h,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8.r),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+  Widget _buildVictoryScreen() {
+    final isNewHighScore = _score > _highScore;
 
-            // Error State
-            if (_hasError && !_isLoading)
-              Container(
-                color: AppColors.bgClr,
-                padding: EdgeInsets.all(20.w),
-                child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.error_outline, color: Colors.red, size: 64.sp),
-                      16.verticalSpace,
-                      Text(
-                        'Failed to load game',
-                        style: AppTextStyles.lufgaMedium.copyWith(
-                          color: Colors.white,
-                          fontSize: 18.sp,
-                        ),
-                      ),
-                      8.verticalSpace,
-                      Text(
-                        'Please check your internet connection and try again.',
-                        style: AppTextStyles.regular.copyWith(
-                          color: Colors.white.withOpacity(0.7),
-                          fontSize: 14.sp,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                      24.verticalSpace,
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          ElevatedButton(
-                            onPressed: _openInExternalBrowser,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.primaryColor,
-                              padding: EdgeInsets.symmetric(
-                                horizontal: 24.w,
-                                vertical: 12.h,
-                              ),
-                            ),
-                            child: Text(
-                              'Open in Browser',
-                              style: AppTextStyles.medium.copyWith(
-                                color: Colors.black,
-                                fontSize: 14.sp,
-                              ),
-                            ),
-                          ),
-                          16.horizontalSpace,
-                          OutlinedButton(
-                            onPressed: () {
-                              setState(() {
-                                _isLoading = true;
-                                _hasError = false;
-                              });
-                              _webViewController?.reload();
-                            },
-                            style: OutlinedButton.styleFrom(
-                              padding: EdgeInsets.symmetric(
-                                horizontal: 24.w,
-                                vertical: 12.h,
-                              ),
-                              side: BorderSide(color: AppColors.primaryColor),
-                            ),
-                            child: Text(
-                              'Retry',
-                              style: AppTextStyles.medium.copyWith(
-                                color: AppColors.primaryColor,
-                                fontSize: 14.sp,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
+    return Center(
+      child: Container(
+        margin: EdgeInsets.all(16.w),
+        padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 32.h),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.07),
+          borderRadius: BorderRadius.circular(24.r),
+          border: Border.all(color: Colors.white.withOpacity(0.15)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.4),
+              blurRadius: 30,
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.emoji_events_outlined, color: Colors.amber, size: 72.sp),
+            16.verticalSpace,
+            Text(
+              'VICTORY!',
+              style: AppTextStyles.lufgaLarge.copyWith(
+                color: Colors.white,
+                fontSize: 26.sp,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 2,
               ),
+            ),
+            8.verticalSpace,
+            Text(
+              isNewHighScore 
+                  ? '🎉 New High Score Set!' 
+                  : 'You have cleared the board!',
+              style: AppTextStyles.medium.copyWith(
+                color: AppColors.primaryColor,
+                fontSize: 14.sp,
+              ),
+            ),
+            24.verticalSpace,
+            
+            // Victory Details Card
+            Container(
+              padding: EdgeInsets.all(16.w),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.3),
+                borderRadius: BorderRadius.circular(16.r),
+              ),
+              child: Column(
+                children: [
+                  _buildVictoryStatRow('Difficulty', _difficulty.name.toUpperCase()),
+                  const Divider(color: Colors.white24),
+                  _buildVictoryStatRow('Score Obtained', '$_score'),
+                  const Divider(color: Colors.white24),
+                  _buildVictoryStatRow('Total Time', _formatTime(_totalTimeLimit - _timeLeft)),
+                  const Divider(color: Colors.white24),
+                  _buildVictoryStatRow('Total Moves', '$_moves'),
+                ],
+              ),
+            ),
+            
+            28.verticalSpace,
+            PrimaryButton(
+              buttonWidth: 180.w,
+              title: 'Play Again',
+              onTap: _setupGame,
+            ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildDefeatScreen() {
+    return Center(
+      child: Container(
+        margin: EdgeInsets.all(16.w),
+        padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 32.h),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.07),
+          borderRadius: BorderRadius.circular(24.r),
+          border: Border.all(color: Colors.white.withOpacity(0.15)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.4),
+              blurRadius: 30,
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.hourglass_empty_rounded, color: Colors.redAccent, size: 72.sp),
+            16.verticalSpace,
+            Text(
+              'GAME OVER',
+              style: AppTextStyles.lufgaLarge.copyWith(
+                color: Colors.white,
+                fontSize: 26.sp,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 2,
+              ),
+            ),
+            8.verticalSpace,
+            Text(
+              'Time ran out! Keep training your mind!',
+              style: AppTextStyles.medium.copyWith(
+                color: Colors.white.withOpacity(0.7),
+                fontSize: 14.sp,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            24.verticalSpace,
+            
+            // Defeat Details Card
+            Container(
+              padding: EdgeInsets.all(16.w),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.3),
+                borderRadius: BorderRadius.circular(16.r),
+              ),
+              child: Column(
+                children: [
+                  _buildVictoryStatRow('Difficulty', _difficulty.name.toUpperCase()),
+                  const Divider(color: Colors.white24),
+                  _buildVictoryStatRow('Final Score', '$_score'),
+                  const Divider(color: Colors.white24),
+                  _buildVictoryStatRow('Total Moves', '$_moves'),
+                ],
+              ),
+            ),
+            
+            28.verticalSpace,
+            PrimaryButton(
+              buttonWidth: 180.w,
+              title: 'Try Again',
+              onTap: _setupGame,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildVictoryStatRow(String label, String value) {
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: 4.h),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: AppTextStyles.regular.copyWith(
+              color: Colors.white.withOpacity(0.6),
+              fontSize: 14.sp,
+            ),
+          ),
+          Text(
+            value,
+            style: AppTextStyles.lufgaMedium.copyWith(
+              color: Colors.white,
+              fontSize: 15.sp,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class FlipCard extends StatelessWidget {
+  final bool isFaceUp;
+  final Widget front;
+  final Widget back;
+
+  const FlipCard({
+    super.key,
+    required this.isFaceUp,
+    required this.front,
+    required this.back,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 300),
+      transitionBuilder: (Widget child, Animation<double> animation) {
+        final rotate = Tween<double>(begin: 3.14, end: 0.0).animate(animation);
+        return AnimatedBuilder(
+          animation: rotate,
+          child: child,
+          builder: (context, child) {
+            final isFront = ValueKey(isFaceUp) == child!.key;
+            // 3D Tilt perspective effect
+            var tilt = (animation.value - 0.5).abs() * 0.003;
+            tilt = isFront ? -tilt : tilt;
+            final rotationValue = isFront ? rotate.value : rotate.value + 3.14;
+            return Transform(
+              transform: Matrix4.identity()
+                ..setEntry(3, 2, tilt)
+                ..rotateY(rotationValue),
+              alignment: Alignment.center,
+              child: child,
+            );
+          },
+        );
+      },
+      child: isFaceUp
+          ? Container(key: const ValueKey(true), child: front)
+          : Container(key: const ValueKey(false), child: back),
     );
   }
 }

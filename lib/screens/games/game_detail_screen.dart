@@ -235,6 +235,16 @@ class _GameDetailScreenState extends State<GameDetailScreen> {
                                 : Image.asset(
                                     (_currentGame ?? widget.game).imageUrl,
                                     fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) {
+                                      return Container(
+                                        color: Colors.grey[800],
+                                        child: Icon(
+                                          Icons.image_not_supported,
+                                          color: Colors.grey[600],
+                                          size: 60.sp,
+                                        ),
+                                      );
+                                    },
                                   ),
                           ),
                         ),

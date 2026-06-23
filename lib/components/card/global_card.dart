@@ -257,7 +257,27 @@ class _GlobalCardState extends State<GlobalCard> {
                                           238, // 119.h * 2 for better quality
                                     ),
                                   )
-                                : null,
+                                : ClipRRect(
+                                    borderRadius: BorderRadius.circular(14.r),
+                                    child: Image.asset(
+                                      widget.imageAsset,
+                                      width: double.infinity,
+                                      height: 119.h,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (context, error, stackTrace) {
+                                        return Container(
+                                          width: double.infinity,
+                                          height: 119.h,
+                                          color: Colors.grey[800],
+                                          child: Icon(
+                                            Icons.image_not_supported,
+                                            color: Colors.grey[600],
+                                            size: 40.sp,
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ),
                           ),
                     // Blur Overlay
                     if (widget.blur)

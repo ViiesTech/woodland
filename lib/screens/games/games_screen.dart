@@ -6,6 +6,7 @@ import 'package:the_woodlands_series/Components/resource/app_routers.dart';
 import 'package:the_woodlands_series/components/card/global_card.dart';
 import 'package:the_woodlands_series/screens/games/game_detail_screen.dart';
 import 'package:the_woodlands_series/screens/games/add_game_screen.dart';
+import 'package:the_woodlands_series/screens/games/leaderboard_screen.dart';
 import 'package:the_woodlands_series/screens/profile/profile_screen.dart';
 import '../../components/resource/app_assets.dart';
 import '../../components/resource/app_colors.dart';
@@ -60,7 +61,32 @@ class _GamesScreenState extends State<GamesScreen> {
       (games) {
         if (mounted) {
           setState(() {
-            featuredGames = games;
+            final List<GameModel> list = [];
+            
+            // Add local Mind Game
+            list.add(
+              GameModel(
+                id: 'mind_game',
+                title: 'Mind Game',
+                subtitle: 'Train your brain!',
+                imageUrl: 'assets/tempImg/tempGame1.png',
+                gameUrl: 'local',
+                description: 'A local Woodland themed memory game. Train your mind by matching card pairs with minimal moves and time.',
+                category: 'Woodland Series',
+                createdAt: DateTime.now(),
+                updatedAt: DateTime.now(),
+                isPublished: true,
+              ),
+            );
+
+            // Add other games only if they are not redirect URL games (e.g. they have 'local' gameUrl)
+            for (var game in games) {
+              if (game.id != 'mind_game' && game.gameUrl == 'local') {
+                list.add(game);
+              }
+            }
+
+            featuredGames = list;
             _isLoadingGames = false;
           });
         }
@@ -68,6 +94,20 @@ class _GamesScreenState extends State<GamesScreen> {
       onError: (error) {
         if (mounted) {
           setState(() {
+            featuredGames = [
+              GameModel(
+                id: 'mind_game',
+                title: 'Mind Game',
+                subtitle: 'Train your brain!',
+                imageUrl: 'assets/tempImg/tempGame1.png',
+                gameUrl: 'local',
+                description: 'A local Woodland themed memory game. Train your mind by matching card pairs with minimal moves and time.',
+                category: 'Woodland Series',
+                createdAt: DateTime.now(),
+                updatedAt: DateTime.now(),
+                isPublished: true,
+              )
+            ];
             _isLoadingGames = false;
           });
         }
@@ -121,6 +161,26 @@ class _GamesScreenState extends State<GamesScreen> {
                         ),
                         Row(
                           children: [
+                            // Leaderboard Button
+                            GestureDetector(
+                              onTap: () {
+                                AppRouter.routeTo(context, const LeaderboardScreen());
+                              },
+                              child: Container(
+                                margin: EdgeInsets.only(right: 12.w),
+                                padding: EdgeInsets.all(8.w),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.05),
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: Colors.white.withOpacity(0.1)),
+                                ),
+                                child: Icon(
+                                  Icons.emoji_events,
+                                  color: Colors.amber,
+                                  size: 20.sp,
+                                ),
+                              ),
+                            ),
                             // Add Game Icon (only for admin)
                             if (isAdmin)
                               GestureDetector(
