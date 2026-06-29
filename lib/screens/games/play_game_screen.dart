@@ -14,15 +14,13 @@ enum GameDifficulty { easy, medium, hard }
 
 class MemoryCard {
   final int id;
-  final IconData icon;
-  final Color color;
+  final String imagePath;
   bool isFaceUp;
   bool isMatched;
 
   MemoryCard({
     required this.id,
-    required this.icon,
-    required this.color,
+    required this.imagePath,
     this.isFaceUp = false,
     this.isMatched = false,
   });
@@ -119,56 +117,40 @@ class _PlayGameScreenState extends State<PlayGameScreen> {
     int timeLimit;
     switch (_difficulty) {
       case GameDifficulty.easy:
-        pairsCount = 6;
-        gridCols = 3;
+        pairsCount = 4;
+        gridCols = 4;
         timeLimit = 90; // generous time (1:30)
         break;
       case GameDifficulty.medium:
-        pairsCount = 8;
-        gridCols = 4;
+        pairsCount = 6;
+        gridCols = 3;
         timeLimit = 60; // normal time (1:00)
         break;
       case GameDifficulty.hard:
-        pairsCount = 10;
+        pairsCount = 8;
         gridCols = 4;
         timeLimit = 40; // challenging time (0:40)
         break;
     }
 
-    // Curated premium icons matching a Woodland theme
-    final availableIcons = [
-      Icons.pets,            // Animals
-      Icons.park,            // Trees
-      Icons.flutter_dash,    // Birds
-      Icons.eco,             // Leaves
-      Icons.star,            // Night Sky
-      Icons.bug_report,      // Forest Bugs
-      Icons.wb_sunny,        // Sunrise
-      Icons.water_drop,      // Morning Dew
-      Icons.terrain,         // Hills/Mountains
-      Icons.local_florist,   // Flowers
-    ];
-
-    final availableColors = [
-      Colors.orangeAccent,
-      Colors.greenAccent,
-      Colors.lightBlueAccent,
-      Colors.pinkAccent,
-      Colors.amberAccent,
-      Colors.redAccent,
-      Colors.purpleAccent,
-      Colors.tealAccent,
-      Colors.cyanAccent,
-      Colors.indigoAccent,
+    // Woodland character images in assets/matchinggameimg/
+    final availableImages = [
+      'assets/matchinggameimg/Birch .png',
+      'assets/matchinggameimg/Drake.png',
+      'assets/matchinggameimg/Leavitt.png',
+      'assets/matchinggameimg/Red squirrel.png',
+      'assets/matchinggameimg/ivy ..png',
+      'assets/matchinggameimg/lilly.png',
+      'assets/matchinggameimg/little duckling.png',
+      'assets/matchinggameimg/scamper ..png',
     ];
 
     List<MemoryCard> newCards = [];
     for (int i = 0; i < pairsCount; i++) {
-      final icon = availableIcons[i];
-      final color = availableColors[i];
+      final imagePath = availableImages[i];
       
-      newCards.add(MemoryCard(id: i * 2, icon: icon, color: color));
-      newCards.add(MemoryCard(id: i * 2 + 1, icon: icon, color: color));
+      newCards.add(MemoryCard(id: i * 2, imagePath: imagePath));
+      newCards.add(MemoryCard(id: i * 2 + 1, imagePath: imagePath));
     }
 
     newCards.shuffle();
@@ -226,7 +208,7 @@ class _PlayGameScreenState extends State<PlayGameScreen> {
       final card1 = _cards[_selectedCardIndices[0]];
       final card2 = _cards[_selectedCardIndices[1]];
 
-      if (card1.icon == card2.icon) {
+      if (card1.imagePath == card2.imagePath) {
         // Match found!
         _consecutiveMatches++;
         final pointsGained = 100 * _consecutiveMatches;
@@ -536,11 +518,14 @@ class _PlayGameScreenState extends State<PlayGameScreen> {
                       )
                     ],
                   ),
-                  child: Center(
-                    child: Icon(
-                      card.icon,
-                      color: card.color,
-                      size: 36.sp,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(16.r),
+                    child: Padding(
+                      padding: EdgeInsets.all(8.w),
+                      child: Image.asset(
+                        card.imagePath,
+                        fit: BoxFit.contain,
+                      ),
                     ),
                   ),
                 ),
