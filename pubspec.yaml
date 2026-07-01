@@ -88,6 +88,7 @@ flutter:
   assets:
     - assets/tempImg/
     - assets/matchinggameimg/
+    - assets/wordsearchgame/
     - assets/icons/
     - assets/audio/
     - assets/logo.svg

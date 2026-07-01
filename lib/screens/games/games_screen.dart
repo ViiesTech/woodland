@@ -79,9 +79,25 @@ class _GamesScreenState extends State<GamesScreen> {
               ),
             );
 
+            // Add local Word Search Game
+            list.add(
+              GameModel(
+                id: 'word_search',
+                title: 'Woodland Word Search',
+                subtitle: 'Find hidden forest words!',
+                imageUrl: 'assets/wordsearchgame/wordseach.png',
+                gameUrl: 'local',
+                description: 'Search for hidden woodland animal and plant names in the letter grid. Find all words before time runs out!',
+                category: 'Woodland Series',
+                createdAt: DateTime.now(),
+                updatedAt: DateTime.now(),
+                isPublished: true,
+              ),
+            );
+
             // Add other games only if they are not redirect URL games (e.g. they have 'local' gameUrl)
             for (var game in games) {
-              if (game.id != 'mind_game' && game.gameUrl == 'local') {
+              if (game.id != 'mind_game' && game.id != 'word_search' && game.gameUrl == 'local') {
                 list.add(game);
               }
             }
@@ -106,7 +122,19 @@ class _GamesScreenState extends State<GamesScreen> {
                 createdAt: DateTime.now(),
                 updatedAt: DateTime.now(),
                 isPublished: true,
-              )
+              ),
+              GameModel(
+                id: 'word_search',
+                title: 'Woodland Word Search',
+                subtitle: 'Find hidden forest words!',
+                imageUrl: 'assets/wordsearchgame/wordseach.png',
+                gameUrl: 'local',
+                description: 'Search for hidden woodland animal and plant names in the letter grid. Find all words before time runs out!',
+                category: 'Woodland Series',
+                createdAt: DateTime.now(),
+                updatedAt: DateTime.now(),
+                isPublished: true,
+              ),
             ];
             _isLoadingGames = false;
           });

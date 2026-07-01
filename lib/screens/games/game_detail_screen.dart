@@ -14,6 +14,7 @@ import 'package:the_woodlands_series/bloc/auth/auth_bloc.dart';
 import 'package:the_woodlands_series/bloc/auth/auth_state.dart';
 import 'play_game_screen.dart';
 import 'edit_game_screen.dart';
+import 'word_search_screen.dart';
 
 class GameDetailScreen extends StatefulWidget {
   final GameModel game;
@@ -37,33 +38,55 @@ class _GameDetailScreenState extends State<GameDetailScreen> {
   }
 
   void _loadSimilarGames() {
-    // Load games from the same category, excluding the current game
     _gamesSubscription = GameService.getAllGames().listen((games) {
       if (mounted) {
         setState(() {
-          final currentGame = _currentGame ?? widget.game;
-          similarGames = games
-              .where(
-                (game) =>
-                    game.id != currentGame.id &&
-                    game.category == currentGame.category,
-              )
-              .take(6)
-              .toList();
+          final List<GameModel> allExistingGames = [];
+          
+          // 1. Add local Mind Game
+          allExistingGames.add(
+            GameModel(
+              id: 'mind_game',
+              title: 'Mind Game',
+              subtitle: 'Train your brain!',
+              imageUrl: 'assets/tempImg/tempGame1.png',
+              gameUrl: 'local',
+              description: 'A local Woodland themed memory game. Train your mind by matching card pairs with minimal moves and time.',
+              category: 'Woodland Series',
+              createdAt: DateTime.now(),
+              updatedAt: DateTime.now(),
+              isPublished: true,
+            ),
+          );
 
-          // If not enough games in same category, fill with other games
-          if (similarGames.length < 6) {
-            final currentGame = _currentGame ?? widget.game;
-            final otherGames = games
-                .where(
-                  (game) =>
-                      game.id != currentGame.id &&
-                      !similarGames.any((g) => g.id == game.id),
-                )
-                .take(6 - similarGames.length)
-                .toList();
-            similarGames.addAll(otherGames);
+          // 2. Add local Word Search Game
+          allExistingGames.add(
+            GameModel(
+              id: 'word_search',
+              title: 'Woodland Word Search',
+              subtitle: 'Find hidden forest words!',
+              imageUrl: 'assets/wordsearchgame/wordseach.png',
+              gameUrl: 'local',
+              description: 'Search for hidden woodland animal and plant names in the letter grid. Find all words before time runs out!',
+              category: 'Woodland Series',
+              createdAt: DateTime.now(),
+              updatedAt: DateTime.now(),
+              isPublished: true,
+            ),
+          );
+
+          // 3. Add other games from Firebase
+          for (var game in games) {
+            if (game.id != 'mind_game' && game.id != 'word_search') {
+              allExistingGames.add(game);
+            }
           }
+
+          // Filter out the current game
+          final currentGame = _currentGame ?? widget.game;
+          similarGames = allExistingGames
+              .where((game) => game.id != currentGame.id)
+              .toList();
         });
       }
     });
@@ -294,7 +317,14 @@ class _GameDetailScreenState extends State<GameDetailScreen> {
                           title: 'Play Game',
                           onTap: () {
                             final game = _currentGame ?? widget.game;
-                            if (game.gameUrl.isNotEmpty) {
+                            if (game.id == 'word_search') {
+                              AppRouter.routeTo(
+                                context,
+                                const WordSearchScreen(
+                                  gameTitle: 'Woodland Word Search',
+                                ),
+                              );
+                            } else if (game.gameUrl.isNotEmpty) {
                               AppRouter.routeTo(
                                 context,
                                 PlayGameScreen(
@@ -304,7 +334,7 @@ class _GameDetailScreenState extends State<GameDetailScreen> {
                               );
                             } else {
                               ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
+                                const SnackBar(
                                   content: Text('Game URL not available'),
                                   backgroundColor: Colors.red,
                                 ),
@@ -382,14 +412,14 @@ class _GameDetailScreenState extends State<GameDetailScreen> {
 
                     40.verticalSpace,
 
-                    // Similar Games
+                    // More Games
                     Column(
                       children: [
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(
-                              'Similar Games',
+                              'More Games',
                               style: AppTextStyles.lufgaLarge.copyWith(
                                 color: Colors.white,
                                 fontSize: 20.sp,
@@ -402,7 +432,7 @@ class _GameDetailScreenState extends State<GameDetailScreen> {
                             ? Padding(
                                 padding: EdgeInsets.symmetric(vertical: 20.h),
                                 child: Text(
-                                  'No similar games available',
+                                  'No more games available',
                                   style: AppTextStyles.regular.copyWith(
                                     color: Colors.white.withOpacity(0.7),
                                     fontSize: 14.sp,
