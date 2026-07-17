@@ -25,6 +25,7 @@ class _AddEditFolderScreenState extends State<AddEditFolderScreen> {
   final TextEditingController _searchController = TextEditingController();
 
   bool _isPublished = false;
+  String _selectedLanguage = 'English';
   bool _isLoading = false;
   bool _isFetchingBooks = true;
 
@@ -40,6 +41,7 @@ class _AddEditFolderScreenState extends State<AddEditFolderScreen> {
       _titleController.text = widget.folder!.title;
       _descriptionController.text = widget.folder!.description;
       _isPublished = widget.folder!.isPublished;
+      _selectedLanguage = widget.folder!.language;
       if (widget.folder!.bookIds != null) {
         _selectedBookIds.addAll(widget.folder!.bookIds!);
       }
@@ -126,6 +128,7 @@ class _AddEditFolderScreenState extends State<AddEditFolderScreen> {
         bookIds: _selectedBookIds.toList(),
         createdAt: widget.folder?.createdAt ?? DateTime.now(),
         updatedAt: DateTime.now(),
+        language: _selectedLanguage,
       );
 
       if (widget.folder == null) {
@@ -203,6 +206,44 @@ class _AddEditFolderScreenState extends State<AddEditFolderScreen> {
                     hint: 'Folder Description (Optional)',
                     minlines: 2,
                     maxlines: 4,
+                  ),
+                  16.verticalSpace,
+
+                  // Language Selection
+                  _buildSectionTitle('Language Selection'),
+                  8.verticalSpace,
+                  Container(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 16.w,
+                      vertical: 4.h,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.boxClr,
+                      borderRadius: BorderRadius.circular(12.r),
+                      border: Border.all(color: Colors.white.withOpacity(0.1)),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        value: _selectedLanguage,
+                        isExpanded: true,
+                        style: AppTextStyles.medium.copyWith(
+                          color: Colors.white,
+                          fontSize: 14.sp,
+                        ),
+                        dropdownColor: AppColors.boxClr,
+                        items: <String>['English', 'Spanish', 'German', 'Mandarin'].map((lang) {
+                          return DropdownMenuItem<String>(
+                            value: lang,
+                            child: Text(lang),
+                          );
+                        }).toList(),
+                        onChanged: (value) {
+                          setState(() {
+                            _selectedLanguage = value!;
+                          });
+                        },
+                      ),
+                    ),
                   ),
                   24.verticalSpace,
 

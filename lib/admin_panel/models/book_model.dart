@@ -34,6 +34,7 @@ class BookModel {
   final DateTime updatedAt;
   final bool isFolder;
   final List<String>? bookIds;
+  final String language;
 
   BookModel({
     required this.id,
@@ -61,6 +62,7 @@ class BookModel {
     required this.updatedAt,
     this.isFolder = false,
     this.bookIds,
+    this.language = 'English',
   });
 
   Map<String, dynamic> toFirestore() {
@@ -89,6 +91,7 @@ class BookModel {
       'updatedAt': Timestamp.fromDate(updatedAt),
       'isFolder': isFolder,
       'bookIds': bookIds,
+      'language': language,
     };
   }
 
@@ -129,6 +132,7 @@ class BookModel {
                 (data['category'] as String? ?? '') == 'Folder' ||
                 (data['coverImageUrl'] as String? ?? '') == 'folder',
       bookIds: data['bookIds'] != null ? List<String>.from(data['bookIds'] as List) : null,
+      language: data['language'] as String? ?? 'English',
     );
   }
 
@@ -160,6 +164,7 @@ class BookModel {
       'updatedAt': updatedAt.millisecondsSinceEpoch,
       'isFolder': isFolder,
       'bookIds': bookIds,
+      'language': language,
     };
   }
 
@@ -200,6 +205,7 @@ class BookModel {
                 (map['category'] as String? ?? '') == 'Folder' ||
                 (map['coverImageUrl'] as String? ?? '') == 'folder',
       bookIds: map['bookIds'] != null ? List<String>.from(map['bookIds'] as List) : null,
+      language: map['language'] ?? 'English',
     );
   }
 }

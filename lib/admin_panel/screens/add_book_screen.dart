@@ -31,6 +31,7 @@ class _AddBookScreenState extends State<AddBookScreen> {
   final TextEditingController _listenTimeController = TextEditingController();
 
   String _selectedCategory = 'Fiction';
+  String _selectedLanguage = 'English';
   BookType _selectedType = BookType.ebook;
   bool _isPublished = false;
   bool _isLoading = false;
@@ -232,6 +233,49 @@ class _AddBookScreenState extends State<AddBookScreen> {
                         onChanged: (value) {
                           setState(() {
                             _selectedCategory = value!;
+                          });
+                        },
+                      ),
+                    ),
+                  ),
+                  16.verticalSpace,
+
+                  // Language Dropdown
+                  Text(
+                    'Language Selection *',
+                    style: AppTextStyles.lufgaMedium.copyWith(
+                      color: AppColors.primaryColor,
+                      fontSize: 14.sp,
+                    ),
+                  ),
+                  8.verticalSpace,
+                  Container(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 16.w,
+                      vertical: 12.h,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.boxClr,
+                      borderRadius: BorderRadius.circular(12.r),
+                      border: Border.all(color: Colors.white.withOpacity(0.2)),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        value: _selectedLanguage,
+                        isExpanded: true,
+                        style: AppTextStyles.medium.copyWith(
+                          color: Colors.white,
+                        ),
+                        dropdownColor: AppColors.boxClr,
+                        items: <String>['English', 'Spanish', 'German', 'Mandarin'].map((lang) {
+                          return DropdownMenuItem<String>(
+                            value: lang,
+                            child: Text(lang),
+                          );
+                        }).toList(),
+                        onChanged: (value) {
+                          setState(() {
+                            _selectedLanguage = value!;
                           });
                         },
                       ),
@@ -634,6 +678,7 @@ class _AddBookScreenState extends State<AddBookScreen> {
         isPublished: false,
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
+        language: _selectedLanguage,
       );
 
       await BookService.addBook(book);
@@ -741,6 +786,7 @@ class _AddBookScreenState extends State<AddBookScreen> {
         isPublished: true,
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
+        language: _selectedLanguage,
       );
 
       await BookService.addBook(book);

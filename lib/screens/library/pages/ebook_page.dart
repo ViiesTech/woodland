@@ -34,6 +34,7 @@ class _EbookPageState extends State<EbookPage>
   Map<String, bool> _ownedBooks = {}; // Map of bookId -> isOwned
   bool _isReorderMode = false;
   List<BookModel> _localBooks = [];
+  String _selectedLanguage = 'All';
 
   @override
   void initState() {
@@ -145,6 +146,100 @@ class _EbookPageState extends State<EbookPage>
   @override
   bool get wantKeepAlive => true;
 
+  Widget _buildLanguageDropdown() {
+    return Container(
+      height: 55.h,
+      padding: EdgeInsets.symmetric(horizontal: 12.w),
+      decoration: BoxDecoration(
+        color: AppColors.boxClr,
+        borderRadius: BorderRadius.circular(12.r),
+        border: Border.all(color: Colors.white.withOpacity(0.1)),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: _selectedLanguage,
+          dropdownColor: AppColors.boxClr,
+          icon: Icon(Icons.keyboard_arrow_down, color: Colors.white.withOpacity(0.6), size: 20.sp),
+          style: AppTextStyles.medium.copyWith(
+            color: Colors.white,
+            fontSize: 14.sp,
+          ),
+          onChanged: (String? newValue) {
+            if (newValue != null) {
+              setState(() {
+                _selectedLanguage = newValue;
+              });
+            }
+          },
+          items: <String>['All', 'English', 'Spanish', 'German', 'Mandarin']
+              .map<DropdownMenuItem<String>>((String value) {
+            return DropdownMenuItem<String>(
+              value: value,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    value == 'All' ? Icons.language : Icons.translate,
+                    color: AppColors.primaryColor,
+                    size: 16.sp,
+                  ),
+                  8.horizontalSpace,
+                  Text(value),
+                ],
+              ),
+            );
+          }).toList(),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLanguageDropdownForModal(String currentLang, ValueSetter<String> onChanged) {
+    return Container(
+      height: 40.h,
+      padding: EdgeInsets.symmetric(horizontal: 8.w),
+      decoration: BoxDecoration(
+        color: AppColors.boxClr,
+        borderRadius: BorderRadius.circular(8.r),
+        border: Border.all(color: Colors.white.withOpacity(0.1)),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: currentLang,
+          dropdownColor: AppColors.boxClr,
+          icon: Icon(Icons.keyboard_arrow_down, color: Colors.white.withOpacity(0.6), size: 16.sp),
+          style: AppTextStyles.medium.copyWith(
+            color: Colors.white,
+            fontSize: 12.sp,
+          ),
+          onChanged: (String? newValue) {
+            if (newValue != null) {
+              onChanged(newValue);
+            }
+          },
+          items: <String>['All', 'English', 'Spanish', 'German', 'Mandarin']
+              .map<DropdownMenuItem<String>>((String value) {
+            return DropdownMenuItem<String>(
+              value: value,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    value == 'All' ? Icons.language : Icons.translate,
+                    color: AppColors.primaryColor,
+                    size: 14.sp,
+                  ),
+                  6.horizontalSpace,
+                  Text(value),
+                ],
+              ),
+            );
+          }).toList(),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     super.build(context); // Required for AutomaticKeepAliveClientMixin
@@ -156,21 +251,29 @@ class _EbookPageState extends State<EbookPage>
           children: [
             Padding(
               padding: EdgeInsets.symmetric(horizontal: 16.w),
-              child: PrimaryTextField(
-                controller: _searchController,
-                hint: 'Title, author or keyword',
-                prefixIcon: Icon(Icons.search, size: 20.sp),
-                height: 55.h,
-                verticalPad: 10.h,
-                onChanged: (value) {
-                  setState(() {
-                    _searchQuery = value;
-                  });
-                  // Reload recent searches when search is cleared
-                  if (value.trim().isEmpty) {
-                    _loadRecentSearches();
-                  }
-                },
+              child: Row(
+                children: [
+                  Expanded(
+                    child: PrimaryTextField(
+                      controller: _searchController,
+                      hint: 'Title, author or keyword',
+                      prefixIcon: Icon(Icons.search, size: 20.sp),
+                      height: 55.h,
+                      verticalPad: 10.h,
+                      onChanged: (value) {
+                        setState(() {
+                          _searchQuery = value;
+                        });
+                        // Reload recent searches when search is cleared
+                        if (value.trim().isEmpty) {
+                          _loadRecentSearches();
+                        }
+                      },
+                    ),
+                  ),
+                  12.horizontalSpace,
+                  _buildLanguageDropdown(),
+                ],
               ),
             ),
             16.verticalSpace,
@@ -207,7 +310,10 @@ class _EbookPageState extends State<EbookPage>
                     );
                   }
 
-                  final books = snapshot.data ?? [];
+                  var books = snapshot.data ?? [];
+                  if (_selectedLanguage != 'All') {
+                    books = books.where((book) => book.language == _selectedLanguage).toList();
+                  }
 
                   if (_isReorderMode) {
                     if (_localBooks.isEmpty || _localBooks.length != books.length) {
@@ -356,10 +462,15 @@ class _EbookPageState extends State<EbookPage>
                               height: 200.h,
                               child: ListView.builder(
                                 scrollDirection: Axis.horizontal,
-                                itemCount: _recentSearchBooks.length,
+                                itemCount: _recentSearchBooks
+                                    .where((book) => _selectedLanguage == 'All' || book.language == _selectedLanguage)
+                                    .length,
                                 padding: EdgeInsets.symmetric(horizontal: 16.w),
                                 itemBuilder: (context, index) {
-                                  final book = _recentSearchBooks[index];
+                                  final filteredRecent = _recentSearchBooks
+                                      .where((book) => _selectedLanguage == 'All' || book.language == _selectedLanguage)
+                                      .toList();
+                                  final book = filteredRecent[index];
                                   return Container(
                                     margin: EdgeInsets.only(right: 16.w),
                                     child: _buildBookCard(book, isAdmin),
@@ -438,6 +549,8 @@ class _EbookPageState extends State<EbookPage>
     // Increment the view count for the folder
     BookService.incrementViewCount(folder.id);
 
+    String localSelectedLanguage = _selectedLanguage;
+
     showModalBottomSheet(
       context: context,
       backgroundColor: AppColors.bgClr,
@@ -447,159 +560,175 @@ class _EbookPageState extends State<EbookPage>
       ),
       builder: (context) {
         final bookIds = folder.bookIds ?? [];
-        return DraggableScrollableSheet(
-          initialChildSize: 0.6,
-          minChildSize: 0.4,
-          maxChildSize: 0.95,
-          expand: false,
-          builder: (context, scrollController) {
-            return Container(
-              padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 40.w,
-                      height: 5.h,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.3),
-                        borderRadius: BorderRadius.circular(10.r),
-                      ),
-                    ),
-                  ),
-                  16.verticalSpace,
-                  Row(
+        return StatefulBuilder(
+          builder: (BuildContext context, StateSetter setModalState) {
+            return DraggableScrollableSheet(
+              initialChildSize: 0.6,
+              minChildSize: 0.4,
+              maxChildSize: 0.95,
+              expand: false,
+              builder: (context, scrollController) {
+                return Container(
+                  padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(
-                        Icons.folder_open,
-                        color: AppColors.primaryColor,
-                        size: 28.sp,
-                      ),
-                      12.horizontalSpace,
-                      Expanded(
-                        child: Text(
-                          folder.title,
-                          style: AppTextStyles.lufgaLarge.copyWith(
-                            color: Colors.white,
-                            fontSize: 18.sp,
-                            fontWeight: FontWeight.bold,
+                      Center(
+                        child: Container(
+                          width: 40.w,
+                          height: 5.h,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.3),
+                            borderRadius: BorderRadius.circular(10.r),
                           ),
-                          maxLines: 1,
+                        ),
+                      ),
+                      16.verticalSpace,
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.folder_open,
+                            color: AppColors.primaryColor,
+                            size: 28.sp,
+                          ),
+                          12.horizontalSpace,
+                          Expanded(
+                            child: Text(
+                              folder.title,
+                              style: AppTextStyles.lufgaLarge.copyWith(
+                                color: Colors.white,
+                                fontSize: 18.sp,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          12.horizontalSpace,
+                          _buildLanguageDropdownForModal(localSelectedLanguage, (newValue) {
+                            setModalState(() {
+                              localSelectedLanguage = newValue;
+                            });
+                          }),
+                          if (isAdmin) ...[
+                            IconButton(
+                              icon: Icon(Icons.edit, color: AppColors.primaryColor, size: 20.sp),
+                              tooltip: 'Edit Folder',
+                              onPressed: () async {
+                                Navigator.pop(context); // Close the sheet
+                                await AppRouter.routeTo(
+                                  context,
+                                  AddEditFolderScreen(folder: folder),
+                                );
+                              },
+                            ),
+                          ],
+                        ],
+                      ),
+                      if (folder.description.isNotEmpty) ...[
+                        8.verticalSpace,
+                        Text(
+                          folder.description,
+                          style: AppTextStyles.regular.copyWith(
+                            color: Colors.white.withOpacity(0.6),
+                            fontSize: 12.sp,
+                          ),
+                          maxLines: 3,
                           overflow: TextOverflow.ellipsis,
                         ),
-                      ),
-                      if (isAdmin) ...[
-                        IconButton(
-                          icon: Icon(Icons.edit, color: AppColors.primaryColor, size: 20.sp),
-                          tooltip: 'Edit Folder',
-                          onPressed: () async {
-                            Navigator.pop(context); // Close the sheet
-                            await AppRouter.routeTo(
-                              context,
-                              AddEditFolderScreen(folder: folder),
-                            );
-                          },
-                        ),
                       ],
+                      16.verticalSpace,
+                      Divider(color: Colors.white.withOpacity(0.1)),
+                      16.verticalSpace,
+                      Expanded(
+                        child: bookIds.isEmpty
+                            ? Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.library_books,
+                                      color: Colors.white.withOpacity(0.2),
+                                      size: 48.sp,
+                                    ),
+                                    12.verticalSpace,
+                                    Text(
+                                      'This folder is empty',
+                                      style: AppTextStyles.medium.copyWith(
+                                        color: Colors.white.withOpacity(0.5),
+                                        fontSize: 14.sp,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              )
+                            : StreamBuilder<List<BookModel>>(
+                                stream: BookService.getAllPublishedBooks(),
+                                builder: (context, snapshot) {
+                                  if (snapshot.connectionState == ConnectionState.waiting &&
+                                      !snapshot.hasData) {
+                                    return const Center(
+                                      child: CircularProgressIndicator(
+                                        color: Colors.orange,
+                                      ),
+                                    );
+                                  }
+                                  if (snapshot.hasError) {
+                                    return Center(
+                                      child: Text(
+                                        'Error loading books',
+                                        style: AppTextStyles.regular.copyWith(
+                                          color: Colors.white.withOpacity(0.5),
+                                          fontSize: 12.sp,
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                  
+                                  final allBooks = snapshot.data ?? [];
+                                  var folderBooks = allBooks
+                                      .where((book) => bookIds.contains(book.id))
+                                      .toList();
+
+                                  if (localSelectedLanguage != 'All') {
+                                    folderBooks = folderBooks
+                                        .where((book) => book.language == localSelectedLanguage)
+                                        .toList();
+                                  }
+
+                                  if (folderBooks.isEmpty) {
+                                    return Center(
+                                      child: Text(
+                                        'No books available in this folder',
+                                        style: AppTextStyles.regular.copyWith(
+                                          color: Colors.white.withOpacity(0.5),
+                                          fontSize: 12.sp,
+                                        ),
+                                      ),
+                                    );
+                                  }
+
+                                  return GridView.builder(
+                                    controller: scrollController,
+                                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                      crossAxisCount: 3,
+                                      crossAxisSpacing: 12.w,
+                                      mainAxisSpacing: 16.h,
+                                      childAspectRatio: 0.52,
+                                    ),
+                                    itemCount: folderBooks.length,
+                                    itemBuilder: (context, index) {
+                                      final book = folderBooks[index];
+                                      return _buildBookCard(book, isAdmin);
+                                    },
+                                  );
+                                },
+                              ),
+                      ),
                     ],
                   ),
-                  if (folder.description.isNotEmpty) ...[
-                    8.verticalSpace,
-                    Text(
-                      folder.description,
-                      style: AppTextStyles.regular.copyWith(
-                        color: Colors.white.withOpacity(0.6),
-                        fontSize: 12.sp,
-                      ),
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                  16.verticalSpace,
-                  Divider(color: Colors.white.withOpacity(0.1)),
-                  16.verticalSpace,
-                  Expanded(
-                    child: bookIds.isEmpty
-                        ? Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.library_books,
-                                  color: Colors.white.withOpacity(0.2),
-                                  size: 48.sp,
-                                ),
-                                12.verticalSpace,
-                                Text(
-                                  'This folder is empty',
-                                  style: AppTextStyles.medium.copyWith(
-                                    color: Colors.white.withOpacity(0.5),
-                                    fontSize: 14.sp,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          )
-                        : StreamBuilder<List<BookModel>>(
-                            stream: BookService.getAllPublishedBooks(),
-                            builder: (context, snapshot) {
-                              if (snapshot.connectionState == ConnectionState.waiting &&
-                                  !snapshot.hasData) {
-                                return const Center(
-                                  child: CircularProgressIndicator(
-                                    color: Colors.orange,
-                                  ),
-                                );
-                              }
-                              if (snapshot.hasError) {
-                                return Center(
-                                  child: Text(
-                                    'Error loading books',
-                                    style: AppTextStyles.regular.copyWith(
-                                      color: Colors.white.withOpacity(0.5),
-                                      fontSize: 12.sp,
-                                    ),
-                                  ),
-                                );
-                              }
-                              
-                              final allBooks = snapshot.data ?? [];
-                              final folderBooks = allBooks
-                                  .where((book) => bookIds.contains(book.id))
-                                  .toList();
-
-                              if (folderBooks.isEmpty) {
-                                return Center(
-                                  child: Text(
-                                    'No books available in this folder',
-                                    style: AppTextStyles.regular.copyWith(
-                                      color: Colors.white.withOpacity(0.5),
-                                      fontSize: 12.sp,
-                                    ),
-                                  ),
-                                );
-                              }
-
-                              return GridView.builder(
-                                controller: scrollController,
-                                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                                  crossAxisCount: 3,
-                                  crossAxisSpacing: 12.w,
-                                  mainAxisSpacing: 16.h,
-                                  childAspectRatio: 0.52,
-                                ),
-                                itemCount: folderBooks.length,
-                                itemBuilder: (context, index) {
-                                  final book = folderBooks[index];
-                                  return _buildBookCard(book, isAdmin);
-                                },
-                              );
-                            },
-                          ),
-                  ),
-                ],
-              ),
+                );
+              },
             );
           },
         );

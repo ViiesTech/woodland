@@ -32,6 +32,7 @@ class _AudiobookPageState extends State<AudiobookPage>
   Map<String, Map<String, dynamic>> _listeningProgress =
       {}; // Local state for progress
   Map<String, bool> _ownedBooks = {}; // Map of bookId -> isOwned
+  String _selectedLanguage = 'All';
 
   @override
   void initState() {
@@ -85,6 +86,54 @@ class _AudiobookPageState extends State<AudiobookPage>
   @override
   bool get wantKeepAlive => true;
 
+  Widget _buildLanguageDropdown() {
+    return Container(
+      height: 55.h,
+      padding: EdgeInsets.symmetric(horizontal: 12.w),
+      decoration: BoxDecoration(
+        color: AppColors.boxClr,
+        borderRadius: BorderRadius.circular(12.r),
+        border: Border.all(color: Colors.white.withOpacity(0.1)),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: _selectedLanguage,
+          dropdownColor: AppColors.boxClr,
+          icon: Icon(Icons.keyboard_arrow_down, color: Colors.white.withOpacity(0.6), size: 20.sp),
+          style: AppTextStyles.medium.copyWith(
+            color: Colors.white,
+            fontSize: 14.sp,
+          ),
+          onChanged: (String? newValue) {
+            if (newValue != null) {
+              setState(() {
+                _selectedLanguage = newValue;
+              });
+            }
+          },
+          items: <String>['All', 'English', 'Spanish', 'German', 'Mandarin']
+              .map<DropdownMenuItem<String>>((String value) {
+            return DropdownMenuItem<String>(
+              value: value,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    value == 'All' ? Icons.language : Icons.translate,
+                    color: AppColors.primaryColor,
+                    size: 16.sp,
+                  ),
+                  8.horizontalSpace,
+                  Text(value),
+                ],
+              ),
+            );
+          }).toList(),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     super.build(context); // Required for AutomaticKeepAliveClientMixin
@@ -96,17 +145,25 @@ class _AudiobookPageState extends State<AudiobookPage>
           children: [
             Padding(
               padding: EdgeInsets.symmetric(horizontal: 16.w),
-              child: PrimaryTextField(
-                controller: _searchController,
-                hint: 'Title, author or keyword',
-                prefixIcon: Icon(Icons.search, size: 20.sp),
-                height: 55.h,
-                verticalPad: 10.h,
-                onChanged: (value) {
-                  setState(() {
-                    _searchQuery = value;
-                  });
-                },
+              child: Row(
+                children: [
+                  Expanded(
+                    child: PrimaryTextField(
+                      controller: _searchController,
+                      hint: 'Title, author or keyword',
+                      prefixIcon: Icon(Icons.search, size: 20.sp),
+                      height: 55.h,
+                      verticalPad: 10.h,
+                      onChanged: (value) {
+                        setState(() {
+                          _searchQuery = value;
+                        });
+                      },
+                    ),
+                  ),
+                  12.horizontalSpace,
+                  _buildLanguageDropdown(),
+                ],
               ),
             ),
             16.verticalSpace,
@@ -150,7 +207,10 @@ class _AudiobookPageState extends State<AudiobookPage>
                     );
                   }
 
-                  final books = snapshot.data ?? [];
+                  var books = snapshot.data ?? [];
+                  if (_selectedLanguage != 'All') {
+                    books = books.where((book) => book.language == _selectedLanguage).toList();
+                  }
 
                   if (books.isEmpty) {
                     return Center(
@@ -207,7 +267,12 @@ class _AudiobookPageState extends State<AudiobookPage>
                                 );
                               }
 
-                              final trendingBooks = trendingSnapshot.data ?? [];
+                               var trendingBooks = trendingSnapshot.data ?? [];
+                               if (_selectedLanguage != 'All') {
+                                 trendingBooks = trendingBooks
+                                     .where((book) => book.language == _selectedLanguage)
+                                     .toList();
+                               }
 
                               if (trendingBooks.isEmpty) {
                                 return SizedBox.shrink();

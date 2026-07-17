@@ -33,6 +33,7 @@ class _AddBookScreenState extends State<AddBookScreen> {
   );
 
   BookType _selectedType = BookType.ebook;
+  String _selectedLanguage = 'English';
   File? _coverImageFile;
   File? _pdfFile;
   String? _coverImageUrl;
@@ -568,6 +569,7 @@ class _AddBookScreenState extends State<AddBookScreen> {
         isPublished: _isPublished,
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
+        language: _selectedLanguage,
       );
 
       await BookService.addBook(book);
@@ -740,6 +742,50 @@ class _AddBookScreenState extends State<AddBookScreen> {
               PrimaryTextField(
                 controller: _categoryController,
                 hint: 'Category (default: ${_categories[0]})',
+              ),
+              16.verticalSpace,
+
+              // Language selection
+              Text(
+                'Language Selection *',
+                style: AppTextStyles.lufgaMedium.copyWith(
+                  color: Colors.white,
+                  fontSize: 14.sp,
+                ),
+              ),
+              8.verticalSpace,
+              Container(
+                padding: EdgeInsets.symmetric(
+                  horizontal: 16.w,
+                  vertical: 4.h,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.boxClr,
+                  borderRadius: BorderRadius.circular(12.r),
+                  border: Border.all(color: Colors.white.withOpacity(0.1)),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value: _selectedLanguage,
+                    isExpanded: true,
+                    style: AppTextStyles.medium.copyWith(
+                      color: Colors.white,
+                      fontSize: 14.sp,
+                    ),
+                    dropdownColor: AppColors.boxClr,
+                    items: <String>['English', 'Spanish', 'German', 'Mandarin'].map((lang) {
+                      return DropdownMenuItem<String>(
+                        value: lang,
+                        child: Text(lang),
+                      );
+                    }).toList(),
+                    onChanged: (value) {
+                      setState(() {
+                        _selectedLanguage = value!;
+                      });
+                    },
+                  ),
+                ),
               ),
               16.verticalSpace,
 

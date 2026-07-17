@@ -31,6 +31,7 @@ class _EditBookScreenState extends State<EditBookScreen> {
   late TextEditingController _priceController;
 
   String _selectedCategory = 'Fiction';
+  String _selectedLanguage = 'English';
   late BookType _selectedType;
   bool _isLoading = false;
 
@@ -88,6 +89,7 @@ class _EditBookScreenState extends State<EditBookScreen> {
         ? widget.book.coverImageUrl
         : null;
     _pdfUrl = widget.book.pdfUrl;
+    _selectedLanguage = widget.book.language;
   }
 
   @override
@@ -286,6 +288,62 @@ class _EditBookScreenState extends State<EditBookScreen> {
                             onChanged: (value) {
                               setState(() {
                                 _selectedCategory = value!;
+                              });
+                            },
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  16.verticalSpace,
+
+                  // Language Dropdown
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Language Selection *',
+                        style: AppTextStyles.lufgaMedium.copyWith(
+                          color: Colors.white,
+                          fontSize: 14.sp,
+                        ),
+                      ),
+                      8.verticalSpace,
+                      Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 16.w,
+                          vertical: 0.h,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.boxClr,
+                          borderRadius: BorderRadius.circular(12.r),
+                        ),
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<String>(
+                            value: _selectedLanguage,
+                            isExpanded: true,
+                            style: AppTextStyles.regular.copyWith(
+                              color: Colors.white,
+                              fontSize: 12.sp,
+                              fontWeight: FontWeight.w400,
+                            ),
+                            dropdownColor: AppColors.boxClr,
+                            items: <String>['English', 'Spanish', 'German', 'Mandarin'].map((lang) {
+                              return DropdownMenuItem<String>(
+                                value: lang,
+                                child: Text(
+                                  lang,
+                                  style: AppTextStyles.regular.copyWith(
+                                    color: Colors.white,
+                                    fontSize: 14.sp,
+                                    fontWeight: FontWeight.w400,
+                                  ),
+                                ),
+                              );
+                            }).toList(),
+                            onChanged: (value) {
+                              setState(() {
+                                _selectedLanguage = value!;
                               });
                             },
                           ),
@@ -636,6 +694,7 @@ class _EditBookScreenState extends State<EditBookScreen> {
         position: widget.book.position, // Keep original position
         createdAt: widget.book.createdAt, // Keep original creation date
         updatedAt: DateTime.now(), // Update timestamp
+        language: _selectedLanguage,
       );
 
       await BookService.updateBook(widget.book.id, updatedBook);
