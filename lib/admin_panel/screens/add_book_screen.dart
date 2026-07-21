@@ -35,6 +35,7 @@ class _AddBookScreenState extends State<AddBookScreen> {
   BookType _selectedType = BookType.ebook;
   bool _isPublished = false;
   bool _isLoading = false;
+  final TextEditingController _positionController = TextEditingController(text: '0');
 
   // File selection (not uploaded until save)
   File? _coverImageFile;
@@ -62,6 +63,7 @@ class _AddBookScreenState extends State<AddBookScreen> {
     _audioFileController.dispose();
     _readTimeController.dispose();
     _listenTimeController.dispose();
+    _positionController.dispose();
     super.dispose();
   }
 
@@ -280,6 +282,31 @@ class _AddBookScreenState extends State<AddBookScreen> {
                         },
                       ),
                     ),
+                  ),
+                  16.verticalSpace,
+
+                  // Sorting Position
+                  Text(
+                    'Sorting Position Order *',
+                    style: AppTextStyles.lufgaMedium.copyWith(
+                      color: AppColors.primaryColor,
+                      fontSize: 14.sp,
+                    ),
+                  ),
+                  8.verticalSpace,
+                  PrimaryTextField(
+                    controller: _positionController,
+                    hint: 'Enter order position (e.g. 1, 2, 3)',
+                    keyboard: TextInputType.number,
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return 'Position is required';
+                      }
+                      if (int.tryParse(value.trim()) == null) {
+                        return 'Please enter a valid number';
+                      }
+                      return null;
+                    },
                   ),
                   24.verticalSpace,
 
@@ -653,6 +680,8 @@ class _AddBookScreenState extends State<AddBookScreen> {
         finalPdfUrl = _pdfUrl;
       }
 
+      final position = int.tryParse(_positionController.text.trim()) ?? 0;
+
       // Create book model
       final book = BookModel(
         id: '', // Will be set by Firestore
@@ -679,6 +708,7 @@ class _AddBookScreenState extends State<AddBookScreen> {
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
         language: _selectedLanguage,
+        position: position,
       );
 
       await BookService.addBook(book);
@@ -761,6 +791,8 @@ class _AddBookScreenState extends State<AddBookScreen> {
         finalPdfUrl = _pdfUrl;
       }
 
+      final position = int.tryParse(_positionController.text.trim()) ?? 0;
+
       // Create book model
       final book = BookModel(
         id: '', // Will be set by Firestore
@@ -787,6 +819,7 @@ class _AddBookScreenState extends State<AddBookScreen> {
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
         language: _selectedLanguage,
+        position: position,
       );
 
       await BookService.addBook(book);

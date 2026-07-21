@@ -31,6 +31,7 @@ class _AddBookScreenState extends State<AddBookScreen> {
   final TextEditingController _priceController = TextEditingController(
     text: '0.0',
   );
+  final TextEditingController _positionController = TextEditingController(text: '0');
 
   BookType _selectedType = BookType.ebook;
   String _selectedLanguage = 'English';
@@ -79,6 +80,7 @@ class _AddBookScreenState extends State<AddBookScreen> {
     _descriptionController.dispose();
     _categoryController.dispose();
     _priceController.dispose();
+    _positionController.dispose();
     // Dispose chapter controllers
     for (var chapter in _chapters) {
       if (chapter['controller'] != null) {
@@ -549,6 +551,7 @@ class _AddBookScreenState extends State<AddBookScreen> {
       }
 
       final price = double.tryParse(_priceController.text.trim()) ?? 0.0;
+      final position = int.tryParse(_positionController.text.trim()) ?? 0;
 
       final book = BookModel(
         id: '', // Will be set by Firestore
@@ -570,6 +573,7 @@ class _AddBookScreenState extends State<AddBookScreen> {
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
         language: _selectedLanguage,
+        position: position,
       );
 
       await BookService.addBook(book);
@@ -786,6 +790,31 @@ class _AddBookScreenState extends State<AddBookScreen> {
                     },
                   ),
                 ),
+              ),
+              16.verticalSpace,
+
+              // Sorting Position
+              Text(
+                'Sorting Position Order *',
+                style: AppTextStyles.lufgaMedium.copyWith(
+                  color: Colors.white,
+                  fontSize: 14.sp,
+                ),
+              ),
+              8.verticalSpace,
+              PrimaryTextField(
+                controller: _positionController,
+                hint: 'Enter order position (e.g. 1, 2, 3)',
+                keyboard: TextInputType.number,
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Position is required';
+                  }
+                  if (int.tryParse(value.trim()) == null) {
+                    return 'Please enter a valid number';
+                  }
+                  return null;
+                },
               ),
               16.verticalSpace,
 

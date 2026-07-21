@@ -23,6 +23,7 @@ class _AddEditFolderScreenState extends State<AddEditFolderScreen> {
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
   final TextEditingController _searchController = TextEditingController();
+  final TextEditingController _positionController = TextEditingController(text: '0');
 
   bool _isPublished = false;
   String _selectedLanguage = 'English';
@@ -42,6 +43,7 @@ class _AddEditFolderScreenState extends State<AddEditFolderScreen> {
       _descriptionController.text = widget.folder!.description;
       _isPublished = widget.folder!.isPublished;
       _selectedLanguage = widget.folder!.language;
+      _positionController.text = widget.folder!.position.toString();
       if (widget.folder!.bookIds != null) {
         _selectedBookIds.addAll(widget.folder!.bookIds!);
       }
@@ -102,6 +104,7 @@ class _AddEditFolderScreenState extends State<AddEditFolderScreen> {
     _titleController.dispose();
     _descriptionController.dispose();
     _searchController.dispose();
+    _positionController.dispose();
     super.dispose();
   }
 
@@ -113,6 +116,7 @@ class _AddEditFolderScreenState extends State<AddEditFolderScreen> {
     });
 
     try {
+      final position = int.tryParse(_positionController.text.trim()) ?? 0;
       final folderData = BookModel(
         id: widget.folder?.id ?? '',
         title: _titleController.text.trim(),
@@ -129,6 +133,7 @@ class _AddEditFolderScreenState extends State<AddEditFolderScreen> {
         createdAt: widget.folder?.createdAt ?? DateTime.now(),
         updatedAt: DateTime.now(),
         language: _selectedLanguage,
+        position: position,
       );
 
       if (widget.folder == null) {
@@ -244,6 +249,25 @@ class _AddEditFolderScreenState extends State<AddEditFolderScreen> {
                         },
                       ),
                     ),
+                  ),
+                  16.verticalSpace,
+
+                  // Sorting Position
+                  _buildSectionTitle('Sorting Position Order'),
+                  8.verticalSpace,
+                  PrimaryTextField(
+                    controller: _positionController,
+                    hint: 'Enter order position (e.g. 1, 2, 3)',
+                    keyboard: TextInputType.number,
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return 'Position is required';
+                      }
+                      if (int.tryParse(value.trim()) == null) {
+                        return 'Please enter a valid number';
+                      }
+                      return null;
+                    },
                   ),
                   24.verticalSpace,
 

@@ -88,7 +88,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 ),
                                 8.verticalSpace,
                                 Text(
-                                  'What book do you wanna read today?',
+                                  'What books do you want to read today?',
                                   style: AppTextStyles.regular.copyWith(
                                     color: Colors.white.withValues(alpha: 0.5),
                                     fontSize: 14.sp,

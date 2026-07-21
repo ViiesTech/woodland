@@ -29,6 +29,7 @@ class _EditBookScreenState extends State<EditBookScreen> {
   late TextEditingController _coverImageController;
   late TextEditingController _audioFileController;
   late TextEditingController _priceController;
+  late TextEditingController _positionController;
 
   String _selectedCategory = 'Fiction';
   String _selectedLanguage = 'English';
@@ -90,6 +91,9 @@ class _EditBookScreenState extends State<EditBookScreen> {
         : null;
     _pdfUrl = widget.book.pdfUrl;
     _selectedLanguage = widget.book.language;
+    _positionController = TextEditingController(
+      text: widget.book.position.toString(),
+    );
   }
 
   @override
@@ -100,6 +104,7 @@ class _EditBookScreenState extends State<EditBookScreen> {
     _coverImageController.dispose();
     _audioFileController.dispose();
     _priceController.dispose();
+    _positionController.dispose();
     super.dispose();
   }
 
@@ -348,6 +353,36 @@ class _EditBookScreenState extends State<EditBookScreen> {
                             },
                           ),
                         ),
+                      ),
+                    ],
+                  ),
+                  16.verticalSpace,
+
+                  // Sorting Position
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Sorting Position Order *',
+                        style: AppTextStyles.lufgaMedium.copyWith(
+                          color: Colors.white,
+                          fontSize: 14.sp,
+                        ),
+                      ),
+                      8.verticalSpace,
+                      PrimaryTextField(
+                        controller: _positionController,
+                        hint: 'Enter order position (e.g. 1, 2, 3)',
+                        keyboard: TextInputType.number,
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return 'Position is required';
+                          }
+                          if (int.tryParse(value.trim()) == null) {
+                            return 'Please enter a valid number';
+                          }
+                          return null;
+                        },
                       ),
                     ],
                   ),
@@ -691,7 +726,7 @@ class _EditBookScreenState extends State<EditBookScreen> {
         price: price,
         isPublished: widget.book.isPublished, // Keep original published status
         hasEverBeenPublished: widget.book.hasEverBeenPublished, // Keep original hasEverBeenPublished
-        position: widget.book.position, // Keep original position
+        position: int.tryParse(_positionController.text.trim()) ?? widget.book.position, // Update position
         createdAt: widget.book.createdAt, // Keep original creation date
         updatedAt: DateTime.now(), // Update timestamp
         language: _selectedLanguage,

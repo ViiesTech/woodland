@@ -308,7 +308,16 @@ class _SearchScreenState extends State<SearchScreen> {
                     );
                   }
 
-                  final books = snapshot.data ?? [];
+                  var books = snapshot.data ?? [];
+
+                  // Collect all book IDs that are inside folders/collections from the raw list
+                  final folderBookIds = books
+                      .where((b) => b.isFolder && b.bookIds != null)
+                      .expand((b) => b.bookIds!)
+                      .toSet();
+
+                  // Filter out individual books that are placed inside folders
+                  books = books.where((b) => b.isFolder || !folderBookIds.contains(b.id)).toList();
 
                   if (books.isEmpty) {
                     return Padding(
@@ -600,7 +609,7 @@ class _SearchScreenState extends State<SearchScreen> {
                             ),
                           )
                         : StreamBuilder<List<BookModel>>(
-                            stream: BookService.getAllPublishedBooks(),
+                            stream: BookService.getAllBooks(),
                             builder: (context, snapshot) {
                               if (snapshot.connectionState == ConnectionState.waiting &&
                                   !snapshot.hasData) {
