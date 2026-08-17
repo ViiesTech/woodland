@@ -1,12 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
-import 'dart:io' show Platform;
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:flutter_svg/svg.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:the_woodlands_series/components/button/primary_button.dart';
 import 'package:the_woodlands_series/components/checkbox/primary_checkbox.dart';
-import 'package:the_woodlands_series/components/resource/app_assets.dart';
 import 'package:the_woodlands_series/components/resource/app_colors.dart';
 import 'package:the_woodlands_series/components/resource/app_routers.dart';
 import 'package:the_woodlands_series/components/resource/app_textstyle.dart';
@@ -189,61 +185,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                   40.verticalSpace,
-                  // Social Login Buttons - Hide on iOS
-                  if (!kIsWeb && Platform.isIOS == false) ...[
-                    Row(
-                      children: [
-                        // Expanded(
-                        //   child: _buildSocialButton(
-                        //     'Facebook',
-                        //     AppAssets.fbIcon,
-                        //     Colors.blue,
-                        //     shadow: true,
-                        //   ),
-                        // ),
-                        // 16.horizontalSpace,
-                        Expanded(
-                          child: GestureDetector(
-                            onTap: _signInWithGoogle,
-                            child: _buildSocialButton(
-                              'Google',
-                              AppAssets.googleIcon,
-                              Colors.red,
-                              shadow: true,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    16.verticalSpace,
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Container(height: 1, color: Color(0xffE0E5EC)),
-                        ),
-                        Padding(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: SizeCons.getResponsiveWidth(16),
-                          ),
-                          child: Text(
-                            'Or',
-                            style: TextStyle(
-                              color: Colors.green,
-                              fontSize: SizeCons.getResponsiveFontSize(16),
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ),
-                        Expanded(
-                          child: Container(height: 1, color: Color(0xffE0E5EC)),
-                        ),
-                      ],
-                    ),
-                    24.verticalSpace,
-                  ] else ...[
-                    // On iOS, just show spacing without social buttons and "Or" divider
-                    24.verticalSpace,
-                  ],
+                  24.verticalSpace,
                   PrimaryTextField(
                     controller: _emailController,
                     hint: 'Email/Phone Number',
@@ -420,52 +362,6 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  Widget _buildSocialButton(
-    String text,
-    String icon,
-    Color iconColor, {
-    bool shadow = true,
-  }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.boxClr,
-        borderRadius: BorderRadius.circular(SizeCons.getResponsiveRadius(12)),
-        boxShadow: shadow
-            ? [
-                BoxShadow(
-                  color: AppColors.boxClr.withOpacity(0.2),
-                  blurRadius: 8.r,
-                  offset: Offset(0, 4.h),
-                  spreadRadius: 0,
-                ),
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
-                  blurRadius: 4.r,
-                  offset: Offset(0, 2.h),
-                  spreadRadius: 0,
-                ),
-              ]
-            : null,
-      ),
-      padding: EdgeInsets.symmetric(vertical: 16.h),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          SvgPicture.asset(icon, height: 24.h),
-          8.horizontalSpace,
-          Text(
-            text,
-            style: TextStyle(
-              color: Colors.grey[700],
-              fontSize: SizeCons.getResponsiveFontSize(16),
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   void _signIn() {
     final email = _emailController.text.trim();
     final password = _passwordController.text.trim();
@@ -504,11 +400,6 @@ class _LoginScreenState extends State<LoginScreen> {
     context.read<AuthBloc>().add(
       LoginWithEmail(email: email, password: password),
     );
-  }
-
-  void _signInWithGoogle() {
-    // Dispatch Google login event to BLoC
-    context.read<AuthBloc>().add(const LoginWithGoogle());
   }
 
   void _showLoadingDialog(BuildContext context) {
