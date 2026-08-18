@@ -18,6 +18,19 @@ class BookService {
     }
   }
 
+  // Helper comparator for sorting books: positive positions first ascending (1, 2, 3...), then unpositioned by createdAt descending
+  static int _compareBookPositions(BookModel a, BookModel b) {
+    if (a.position > 0 && b.position > 0) {
+      final posCompare = a.position.compareTo(b.position);
+      if (posCompare != 0) return posCompare;
+    } else if (a.position > 0) {
+      return -1;
+    } else if (b.position > 0) {
+      return 1;
+    }
+    return b.createdAt.compareTo(a.createdAt);
+  }
+
   // Get all books
   static Stream<List<BookModel>> getAllBooks() {
     return _firestore
@@ -33,13 +46,7 @@ class BookService {
                 ),
               )
               .toList();
-          books.sort((a, b) {
-            final posCompare = a.position.compareTo(b.position);
-            if (posCompare != 0) {
-              return posCompare;
-            }
-            return b.createdAt.compareTo(a.createdAt);
-          });
+          books.sort(_compareBookPositions);
           return books;
         });
   }
@@ -62,13 +69,7 @@ class BookService {
                 ),
               )
               .toList();
-          books.sort((a, b) {
-            final posCompare = a.position.compareTo(b.position);
-            if (posCompare != 0) {
-              return posCompare;
-            }
-            return b.createdAt.compareTo(a.createdAt);
-          });
+          books.sort(_compareBookPositions);
           return books;
         });
   }
@@ -90,13 +91,7 @@ class BookService {
                 ),
               )
               .toList();
-          books.sort((a, b) {
-            final posCompare = a.position.compareTo(b.position);
-            if (posCompare != 0) {
-              return posCompare;
-            }
-            return b.createdAt.compareTo(a.createdAt);
-          });
+          books.sort(_compareBookPositions);
           return books;
         });
   }
@@ -257,13 +252,7 @@ class BookService {
                 ),
               )
               .toList();
-          books.sort((a, b) {
-            final posCompare = a.position.compareTo(b.position);
-            if (posCompare != 0) {
-              return posCompare;
-            }
-            return b.createdAt.compareTo(a.createdAt);
-          });
+          books.sort(_compareBookPositions);
           return books;
         });
   }
@@ -423,11 +412,10 @@ class BookService {
   }
 
   /// Get top trending books (both ebook and audiobook combined)
-  /// For audiobooks: uses listenCount, for ebooks: uses viewCount
-  /// Returns top N books sorted by popularity
+  /// Returns books sorted in sequence order by position
   static Stream<List<BookModel>> getTopTrendingBooks({
     bool adminMode = false,
-    int limit = 10,
+    int limit = 50,
   }) {
     Stream<QuerySnapshot> stream;
     if (adminMode) {
@@ -452,47 +440,32 @@ class BookService {
           )
           .toList();
 
-      // Calculate popularity score for each book
-      // For audiobooks: use listenCount
-      // For ebooks: use viewCount
-      allBooks.sort((a, b) {
-        final aScore = a.type == BookType.audiobook
-            ? a.listenCount
-            : a.viewCount;
-        final bScore = b.type == BookType.audiobook
-            ? b.listenCount
-            : b.viewCount;
-        return bScore.compareTo(aScore);
-      });
+      allBooks.sort(_compareBookPositions);
 
       return allBooks.take(limit).toList();
     });
   }
 
   /// Get new releases (both ebook and audiobook combined)
-  /// Returns top N books sorted by createdAt (newest first)
+  /// Returns books sorted in sequence order by position
   static Stream<List<BookModel>> getNewReleases({
     bool adminMode = false,
-    int limit = 10,
+    int limit = 50,
   }) {
     Stream<QuerySnapshot> stream;
     if (adminMode) {
       stream = _firestore
           .collection('books')
-          .orderBy('createdAt', descending: true)
-          .limit(limit)
           .snapshots();
     } else {
       stream = _firestore
           .collection('books')
           .where('isPublished', isEqualTo: true)
-          .orderBy('createdAt', descending: true)
-          .limit(limit)
           .snapshots();
     }
 
     return stream.map((snapshot) {
-      return snapshot.docs
+      final books = snapshot.docs
           .map(
             (doc) => BookModel.fromFirestore(
               doc.id,
@@ -500,15 +473,19 @@ class BookService {
             ),
           )
           .toList();
+
+      books.sort(_compareBookPositions);
+
+      return books.take(limit).toList();
     });
   }
 
   /// Get "Coming Soon" books (unpublished books that have never been published)
   /// Returns books where isPublished == false AND hasEverBeenPublished == false
-  /// Sorted by createdAt (newest first)
+  /// Sorted in sequence order by position
   static Stream<List<BookModel>> getComingSoonBooks({
     bool adminMode = false,
-    int limit = 10,
+    int limit = 50,
   }) {
     // For both admin and regular users, we need to filter client-side
     // because Firestore doesn't support querying where isPublished == false AND hasEverBeenPublished == false
@@ -517,14 +494,12 @@ class BookService {
       stream = _firestore
           .collection('books')
           .where('isPublished', isEqualTo: false)
-          .orderBy('createdAt', descending: true)
           .snapshots();
     } else {
       // For regular users, we still query unpublished books (admin feature, but might be visible)
       stream = _firestore
           .collection('books')
           .where('isPublished', isEqualTo: false)
-          .orderBy('createdAt', descending: true)
           .snapshots();
     }
 
@@ -540,8 +515,8 @@ class BookService {
           .where((book) => !book.hasEverBeenPublished)
           .toList();
 
-      // Sort by createdAt (newest first) and limit
-      books.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      // Sort by position (sequence order) then createdAt
+      books.sort(_compareBookPositions);
       return books.take(limit).toList();
     });
   }
@@ -614,13 +589,7 @@ class BookService {
                 ),
               )
               .toList();
-          folders.sort((a, b) {
-            final posCompare = a.position.compareTo(b.position);
-            if (posCompare != 0) {
-              return posCompare;
-            }
-            return b.createdAt.compareTo(a.createdAt);
-          });
+          folders.sort(_compareBookPositions);
           return folders;
         });
   }
@@ -640,13 +609,7 @@ class BookService {
                 ),
               )
               .toList();
-          folders.sort((a, b) {
-            final posCompare = a.position.compareTo(b.position);
-            if (posCompare != 0) {
-              return posCompare;
-            }
-            return b.createdAt.compareTo(a.createdAt);
-          });
+          folders.sort(_compareBookPositions);
           return folders;
         });
   }
@@ -667,13 +630,7 @@ class BookService {
 
     void emitCombined() {
       final combined = [...latestEbooks, ...latestFolders];
-      combined.sort((a, b) {
-        final posCompare = a.position.compareTo(b.position);
-        if (posCompare != 0) {
-          return posCompare;
-        }
-        return b.createdAt.compareTo(a.createdAt);
-      });
+      combined.sort(_compareBookPositions);
       controller.add(combined);
     }
 
@@ -742,13 +699,7 @@ class BookService {
 
     void emitCombined() {
       final combined = [...latestEbooks, ...latestFolders];
-      combined.sort((a, b) {
-        final posCompare = a.position.compareTo(b.position);
-        if (posCompare != 0) {
-          return posCompare;
-        }
-        return b.createdAt.compareTo(a.createdAt);
-      });
+      combined.sort(_compareBookPositions);
       controller.add(combined);
     }
 

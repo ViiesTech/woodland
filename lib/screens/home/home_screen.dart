@@ -293,7 +293,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             StreamBuilder<List<BookModel>>(
                               stream: BookService.getTopTrendingBooks(
                                 adminMode: isAdmin,
-                                limit: 10,
+                                limit: 50,
                               ),
                               builder: (context, snapshot) {
                                 if (snapshot.connectionState ==
@@ -408,7 +408,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             StreamBuilder<List<BookModel>>(
                               stream: BookService.getNewReleases(
                                 adminMode: isAdmin,
-                                limit: 10,
+                                limit: 50,
                               ),
                               builder: (context, snapshot) {
                                 if (snapshot.connectionState ==
@@ -494,7 +494,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         return StreamBuilder<List<BookModel>>(
                           stream: BookService.getComingSoonBooks(
                             adminMode: isAdmin,
-                            limit: 10,
+                            limit: 50,
                           ),
                           builder: (context, snapshot) {
                             if (snapshot.connectionState ==

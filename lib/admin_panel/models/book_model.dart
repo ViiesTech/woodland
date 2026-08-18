@@ -125,7 +125,12 @@ class BookModel {
       isPublished: data['isPublished'] as bool? ?? false,
       hasEverBeenPublished: data['hasEverBeenPublished'] as bool? ?? false,
       price: (data['price'] as num?)?.toDouble() ?? 0.0,
-      position: (data['position'] as num?)?.toInt() ?? 0,
+      position: (data['position'] as num?)?.toInt() ??
+          (data['sortNumber'] as num?)?.toInt() ??
+          (data['sort_number'] as num?)?.toInt() ??
+          (data['sort'] as num?)?.toInt() ??
+          (data['order'] as num?)?.toInt() ??
+          0,
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       updatedAt: (data['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       isFolder: (data['isFolder'] as bool? ?? false) ||
@@ -198,7 +203,12 @@ class BookModel {
       isPublished: map['isPublished'] ?? false,
       hasEverBeenPublished: map['hasEverBeenPublished'] ?? false,
       price: (map['price'] as num?)?.toDouble() ?? 0.0,
-      position: (map['position'] as num?)?.toInt() ?? 0,
+      position: (map['position'] as num?)?.toInt() ??
+          (map['sortNumber'] as num?)?.toInt() ??
+          (map['sort_number'] as num?)?.toInt() ??
+          (map['sort'] as num?)?.toInt() ??
+          (map['order'] as num?)?.toInt() ??
+          0,
       createdAt: DateTime.fromMillisecondsSinceEpoch(map['createdAt'] ?? 0),
       updatedAt: DateTime.fromMillisecondsSinceEpoch(map['updatedAt'] ?? 0),
       isFolder: (map['isFolder'] as bool? ?? false) ||
